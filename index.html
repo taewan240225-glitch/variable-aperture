@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>Variable_Aperture</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@stlite/mountable@0.39.0/build/stlite.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src="https://cdn.jsdelivr.net/npm/@stlite/mountable@0.39.0/build/stlite.js"></script>
+    <script>
+      stlite.mount(
+        {
+          requirements: ["numpy", "pandas", "matplotlib", "xlsxwriter"],
+          entrypoint: "app.py",
+          files: {
+            "app.py": `
+import streamlit as st
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from matplotlib.transforms import Affine2D
+from matplotlib.lines import Line2D
+import math
+
+# --- Utils ---
+def rotMat3(base_pos, moved_pos, theta):
+    rad = np.deg2rad(theta)
+    return [
+        base_pos[0] + np.cos(rad) * (moved_pos[0] - base_pos[0]) - np.sin(rad) * (moved_pos[1] - base_pos[1]),
+        base_pos[1] + np.sin(rad) * (moved_pos[0] - base_pos[0]) + np.cos(rad) * (moved_pos[1] - base_pos[1])
+    ]
+
+def line_intersection(a1, b1, a2, b2):
+    for i in range(len(a1) - 1):
+        for j in range(len(a2) - 1):
+            x1, y1, x2, y2 = a1[i], b1[i], a1[i+1], b1[i+1]
+            x3, y3, x4, y4 = a2[j], b2[j], a2[j+1], b2[j+1]
+            denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+            if denom == 0: continue
+            ix = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / denom
+            iy = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / denom
+            if (min(x1, x2) <= ix <= max(x1, x2) and min(y1, y2) <= iy <= max(y1, y2) and
+                min(x3, x4) <= ix <= max(x3, x4) and min(y3, y4) <= iy <= max(y3, y4)):
+                return (ix, iy)
+    return None
+
+def point_to_segment_distance(x1, y1, x2, y2, a, b):
+    dx, dy = x2 - x1, y2 - y1
+    l2 = dx**2 + dy**2
+    if l2 == 0: return math.hypot(a - x1, b - y1)
+    t = max(0, min(1, ((a - x1) * dx + (b - y1) * dy) / l2))
+    return math.hypot(a - (x1 + t * dx), b - (y1 + t * dy))
+
+def point_to_arc_distance(px, py, cx, cy, r, t1, t2):
+    dx, dy = px - cx, py - cy
+    dist = math.sqrt(dx**2 + dy**2)
+    ang = math.degrees(math.atan2(dy, dx)) % 360
+    if t1 <= ang <= t2: return abs(dist - r)
+    s_x, s_y = cx + r*math.cos(math.radians(t1)), cy + r*math.sin(math.radians(t1))
+    e_x, e_y = cx + r*math.cos(math.radians(t2)), cy + r*math.sin(math.radians(t2))
+    return min(math.hypot(px-s_x, py-s_y), math.hypot(px-e_x, py-e_y))
+
+def circumcircle(points):
+    return max([math.sqrt(x ** 2 + y ** 2) for x, y in points])
+
+def circle_from_3pts(P, Q, R):
+    x1, y1 = P; x2, y2 = Q; x3, y3 = R
+    a, b, c, d = x2-x1, y2-y1, x3-x1, y3-y1
+    det = 2*(a*d - b*c)
+    if np.isclose(det, 0.0): return None
+    e, f = a*(x1+x2)+b*(y1+y2), c*(x1+x3)+d*(y1+y3)
+    cx, cy = (d*e-b*f)/det, (-c*e+a*f)/det
+    return np.array([cx, cy]), np.hypot(cx-x1, cy-y1)
+
+def angle_3pts(A, B, C):
+    u, v = A-B, C-B
+    nu, nv = np.linalg.norm(u), np.linalg.norm(v)
+    if nu < 1e-12 or nv < 1e-12: return 0.0
+    return np.degrees(np.arccos(np.clip(np.dot(u, v)/(nu*nv), -1.0, 1.0)))
+
+def get_params(c_d):
+    a,b,c,d,e,f,g,h,i,j,k,m = [c_d[key] for key in ['a','b','c','d','e','f','g','h','i','j','k','m']]
+    R_S, R_R = c/100, d/100
+    D_M, D_m = j/100, k/1000
+    BLN = int(b)
+    A_S, A_SH = 270-180/BLN, 90-180/BLN
+    A_R, A_B1, A_B2 = a/20, f/10, e/10
+    cv = np.clip(2*((D_M-D_m)/2)/(2*R_S)-np.cos(np.deg2rad(A_SH-A_B2)), -1, 1)
+    A_L = (np.rad2deg(np.arccos(cv))+A_SH-A_B2)/2
+    A_RL = 180-2*A_L
+    P_S = [R_S*np.cos(np.deg2rad(A_S)), R_S*np.sin(np.deg2rad(A_S))]
+    P_R = [R_R*np.cos(np.deg2rad(A_R)), R_R*np.sin(np.deg2rad(A_R))]
+    p2 = [D_m/2*np.cos(np.deg2rad(A_B1)), D_m/2*np.sin(np.deg2rad(A_B1))]
+    p3 = [D_m/2*np.cos(np.deg2rad(A_B2)), D_m/2*np.sin(np.deg2rad(A_B2))]
+    p1 = [p2[0]-(g/100)*np.sin(np.deg2rad(A_B1)), p2[1]+(g/100)*np.cos(np.deg2rad(A_B1))]
+    pe = [(D_m/2+0.1)*np.cos(np.deg2rad(A_B1))-(g/100)*np.sin(np.deg2rad(A_B1)), (D_m/2+0.1)*np.sin(np.deg2rad(A_B1))+(g/100)*np.cos(np.deg2rad(A_B1))]
+    p4 = [p3[0]+(((D_M-D_m)/2)*np.tan(np.deg2rad(A_SH-A_B2-A_L)))*np.cos(np.deg2rad(270+A_B2)), p3[1]+(((D_M-D_m)/2)*np.tan(np.deg2rad(A_SH-A_B2-A_L)))*np.sin(np.deg2rad(270+A_B2))]
+    p5 = [pe[0]+0.1*np.cos(np.deg2rad(A_B1+30)), pe[1]+0.1*np.sin(np.deg2rad(A_B1+30))]
+    p6 = [p5[0]+1.5*np.cos(np.deg2rad(A_B1-60)), p5[1]+1.5*np.sin(np.deg2rad(A_B1-60))]
+    return {
+        'Radius_Stator':R_S, 'Radius_Rotor':R_R, 'Dia_Max':D_M, 'Dia_Min':D_m, 'Blade_N':BLN,
+        'Ang_Stator':A_S, 'Ang_Stator_H':A_SH, 'Ang_Rotor':A_R, 'Ang_B1':A_B1, 'Ang_B2':A_B2, 'Ang_B3':-60,
+        'Pos_Stator':P_S, 'Pos_Rotor':P_R, 'Ang_Rot_Limit':A_RL, 'p1':p1, 'p2':p2, 'p3':p3, 'p4':p4, 'p5':p5, 'p6':p6, 'pe':pe,
+        'Size_Max': 12.33, 'Size_Min': 6.47, 'R_Edge':0.1, 'm': m, 'Ang_Line': A_L
+    }
+
+def compute_ap_at_k(kv, p_d, bln, r_p):
+    h_r = -p_d['Ang_Rot_Limit']/10*kv
+    bp = []
+    for x,y in r_p:
+        xs,ys = x-p_d['Pos_Stator'][0], y-p_d['Pos_Stator'][1]
+        bp.append((xs*np.cos(np.deg2rad(h_r))-ys*np.sin(np.deg2rad(h_r))+p_d['Pos_Stator'][0], xs*np.sin(np.deg2rad(h_r))+ys*np.cos(np.deg2rad(h_r))+p_d['Pos_Stator'][1]))
+    ar = 360/bln
+    ap = [(xr*np.cos(np.deg2rad(ar))-yr*np.sin(np.deg2rad(ar)), xr*np.sin(np.deg2rad(ar))+yr*np.cos(np.deg2rad(ar))) for xr,yr in bp]
+    bx,by = zip(*bp); ax,ay = zip(*ap); inter = None; ci = cj = 0
+    for i in range(len(bx)-1):
+        for j in range(len(ax)-1):
+            res = line_intersection([bx[i],bx[i+1]],[by[i],by[i+1]],[ax[j],ax[j+1]],[ay[j],ay[j+1]])
+            if res: inter = res; ci,cj = i+1,j+1; break
+        if inter: break
+    if not inter: return None
+    ax_l = (inter[0],)+bx[ci:cj]+(rotMat3([0,0],[inter[0],inter[1]],-ar)[0],)
+    ay_l = (inter[1],)+by[ci:cj]+(rotMat3([0,0],[inter[0],inter[1]],-ar)[1],)
+    r_in = min([point_to_segment_distance(ax_l[i],ay_l[i],ax_l[i+1],ay_l[i+1],0,0) for i in range(len(ax_l)-1)])
+    r_out = min(circumcircle(list(zip(ax_l, ay_l))), p_d['m']/200)
+    return {'r_in': r_in, 'r_out': r_out, 'inter': inter, 'ax': ax_l, 'ay': ay_l}
+
+# --- App UI ---
+st.set_page_config(layout="wide")
+st.title("Variable_Aperture")
+
+with st.sidebar:
+    st.header("Settings")
+    
+    def linked_input(label, min_val, max_val, default_val, step=0.01, is_int=False):
+        st.markdown(f"**{label}**")
+        key = f"val_{label}"
+        if key not in st.session_state:
+            st.session_state[key] = float(default_val) if not is_int else int(default_val)
+        
+        col1, col2 = st.columns([2, 1])
+        
+        def update_s():
+            st.session_state[key] = st.session_state[f"n_{label}"]
+        def update_n():
+            st.session_state[key] = st.session_state[f"s_{label}"]
+        
+        # Ensure the value is within bounds for the slider
+        current_val = st.session_state[key]
+        if is_int:
+            s_val = col1.slider(label, int(min_val), int(max_val), value=int(current_val), key=f"s_{label}", on_change=update_n, label_visibility="collapsed")
+            n_val = col2.number_input(label, int(min_val), int(max_val), value=int(current_val), key=f"n_{label}", on_change=update_s, label_visibility="collapsed")
+        else:
+            s_val = col1.slider(label, float(min_val), float(max_val), step=float(step), value=float(current_val), key=f"s_{label}", on_change=update_n, label_visibility="collapsed")
+            n_val = col2.number_input(label, float(min_val), float(max_val), step=float(step), value=float(current_val), key=f"n_{label}", on_change=update_s, label_visibility="collapsed")
+        
+        return st.session_state[key]
+
+    a_s = linked_input("Slot Angle", -50.0, 50.0, -41.0)*10
+    b_s = linked_input("Blade N", 4, 10, 9, is_int=True)
+    c_s = linked_input("Radius Stator", 5.1, 10.0, 6.9)*100
+    d_s = linked_input("Radius Rotor", 4.0, 9.5, 5.8)*100
+    e_s = linked_input("Blade Angle2", -80.0, 20.0, -30.0)*10
+    f_s = linked_input("Blade Angle1", -60.0, 30.0, -7.0)*10
+    g_s = linked_input("Ext Length", 0.0, 3.0, 1.0)*100
+    h_s = linked_input("Rotation Rotor", 0.0, 10.0, 0.0)*10
+    i_s = linked_input("Layer", 2, 4, 3, is_int=True)
+    j_s = linked_input("Aperture Max", 4.0, 9.0, 8.12)*100
+    k_s = linked_input("Aperture Min", 1.0, 3.0, 1.93)*1000
+    m_s = linked_input("Soma", 5.0, 8.0, 7.82)*100
+    
+    rev_s = st.checkbox("Reverse Slot")
+    line_b = st.checkbox("Line Blade")
+    
+    if line_b:
+        f_s = e_s
+        
+    cfg = {
+        'a': a_s, 'b': b_s, 'c': c_s, 'd': d_s, 'e': e_s, 'f': f_s,
+        'g': g_s, 'h': h_s, 'i': i_s, 'j': j_s, 'k': k_s, 'm': m_s
+    }
+
+p = get_params(cfg)
+# DEFINE RP BEFORE USE
+p23_pts = [(p['Dia_Min']/2*np.cos(np.deg2rad(a)), p['Dia_Min']/2*np.sin(np.deg2rad(a))) for a in np.linspace(p['Ang_B1'], p['Ang_B2'], 30)]
+cs_c = rotMat3(p['Pos_Stator'], [0, 0], p['Ang_Rot_Limit'])
+p45_pts = [(cs_c[0]+p['Dia_Max']/2*np.cos(np.deg2rad(a)), cs_c[1]+p['Dia_Max']/2*np.sin(np.deg2rad(a))) for a in np.linspace(p['Ang_B2'], p['Ang_B2']+p['Ang_B3'], 30)]
+rp = [tuple(p['p1'])] + p23_pts + p45_pts
+
+tab1, tab2 = st.tabs(["Design (4-Graphs)", "Pressure Angle Analysis"])
+
+with tab1:
+    c1,c2 = st.columns(2); c3,c4 = st.columns(2)
+    # 1. Iris
+    with c1:
+        st.subheader("1. Iris Layout")
+        f1,ax1 = plt.subplots(figsize=(8,8))
+        ax1.add_patch(patches.Circle([0,0], p['Dia_Min']/2, fc='none', ec='k', ls='--', alpha=0.3))
+        ax1.add_patch(patches.Circle([0,0], p['Dia_Max']/2, fc='none', ec='k', ls='--', alpha=0.3))
+        ax1.add_patch(patches.Circle([0,0], p['Size_Max']/2, fc='none', ec='y', ls='-', alpha=1))
+        ax1.add_patch(patches.Circle([0,0], p['Size_Min']/2, fc='none', ec='y', ls='-', alpha=1))
+        for i in range(int(cfg['b'])):
+            tr_slot = Affine2D().rotate_deg_around(0,0, (360/int(cfg['b']))*(i+1))
+            ax1.add_patch(patches.Arc([0,0], 2*p['Radius_Rotor'], 2*p['Radius_Rotor'], theta1=p['Ang_Stator']+p['Ang_Rotor']*2-(10.0 if rev_s else 0), theta2=p['Ang_Stator']+p['Ang_Rotor']*2+(0 if rev_s else 10.0), ec='r', transform=tr_slot+ax1.transData))
+        colors=['k','b','g','r']; lay, bln = int(cfg['i']), int(cfg['b'])
+        for li in range(lay):
+            for bi in range(bln//lay):
+                tc = Affine2D().rotate_deg_around(0,0,(360/bln)*(lay*bi+1+li))
+                ts = Affine2D().rotate_deg_around(p['Pos_Stator'][0], p['Pos_Stator'][1], -p['Ang_Rot_Limit']/10*cfg['h']/10)
+                tr4 = Affine2D().rotate_deg_around(0,0,p['Ang_Stator']+p['Ang_Rotor']+(360/bln)*(lay*bi+1+li)+cfg['h']/10)
+                comb = ts+tc+ax1.transData
+                ax1.add_patch(patches.Circle(p['Pos_Rotor'], 0.25, fc=colors[li%4], alpha=0.5, transform=tr4+ax1.transData))
+                ax1.add_patch(patches.Circle(p['Pos_Stator'], 0.25, fc=colors[li%4], alpha=0.5, transform=comb))
+                ax1.add_line(Line2D([p['p1'][0],p['p2'][0]],[p['p1'][1],p['p2'][1]], c=colors[li%4], transform=comb))
+                ax1.add_patch(patches.Arc([0,0], p['Dia_Min'], p['Dia_Min'], angle=p['Ang_B2'], theta1=0, theta2=p['Ang_B1']-p['Ang_B2'], ec=colors[li%4], transform=comb))
+                ax1.add_line(Line2D([p['p3'][0],p['p4'][0]],[p['p3'][1],p['p4'][1]], c=colors[li%4], transform=comb))
+                ax1.add_patch(patches.Arc(rotMat3(p['Pos_Stator'],[0,0],p['Ang_Rot_Limit']), p['Dia_Max'], p['Dia_Max'], angle=p['Ang_B2']+p['Ang_B3'], theta1=0, theta2=-p['Ang_B3'], ec=colors[li%4], transform=comb))
+                ax1.add_line(Line2D([p['p5'][0],p['p6'][0]],[p['p5'][1],p['p6'][1]], c=colors[li%4], transform=comb))
+                ax1.add_patch(patches.Arc(p['pe'], 0.2, 0.2, theta1=p['Ang_B1']+30, theta2=p['Ang_B1']+180, ec=colors[li%4], transform=comb))
+        ax1.set_xlim(-8,8); ax1.set_ylim(-8,8); ax1.set_aspect('equal'); st.pyplot(f1)
+
+    # 2. Blade & Gaps
+    with c2:
+        st.subheader("2. Blade & Gaps")
+        f2,ax2 = plt.subplots(figsize=(8,8))
+        ax2.add_line(Line2D([p['p1'][0],p['p2'][0]],[p['p1'][1],p['p2'][1]], c='k'))
+        ax2.add_patch(patches.Arc([0,0], p['Dia_Min'], p['Dia_Min'], angle=p['Ang_B2'], theta1=0, theta2=p['Ang_B1']-p['Ang_B2'], ec='k'))
+        ax2.add_line(Line2D([p['p3'][0],p['p4'][0]], [p['p3'][1],p['p4'][1]], c='k'))
+        ax2.add_patch(patches.Arc(rotMat3(p['Pos_Stator'],[0,0],p['Ang_Rot_Limit']), p['Dia_Max'], p['Dia_Max'], angle=p['Ang_B2']+p['Ang_B3'], theta1=0, theta2=-p['Ang_B3'], ec='k'))
+        ax2.add_line(Line2D([p['p5'][0],p['p6'][0]], [p['p5'][1],p['p6'][1]], c='k'))
+        ax2.add_patch(patches.Arc(p['pe'], 0.2, 0.2, theta1=p['Ang_B1']+30, theta2=p['Ang_B1']+180, ec='k'))
+        gb, get = [], []
+        ang_s = np.linspace(0, p['Ang_Rot_Limit'], 20)
+        for i in range(2):
+            gs = []
+            for j in ang_s:
+                tc = Affine2D().rotate_deg_around(p['Pos_Stator'][0],p['Pos_Stator'][1],-j)+Affine2D().rotate_deg_around(0,0,-((360/bln)+(360/bln*(lay-1)*i)))+Affine2D().rotate_deg_around(p['Pos_Stator'][0],p['Pos_Stator'][1],j)
+                ct = tc.transform_point(p['pe'])
+                ax2.add_patch(patches.Circle(p['pe'], 0.1, fc='none', ec='b' if i==0 else 'k', alpha=0.3, transform=tc+ax2.transData))
+                gs.extend([point_to_segment_distance(p['p3'][0],p['p3'][1],p['p4'][0],p['p4'][1],ct[0],ct[1]), point_to_arc_distance(ct[0],ct[1],p['Pos_Stator'][0],p['Pos_Stator'][1],p['Dia_Max']/2,(p['Ang_B2']-30)%360,p['Ang_B2']%360)])
+                if i==0:
+                    for kv in ang_s:
+                        ct2 = (Affine2D().rotate_deg_around(p['Pos_Stator'][0],p['Pos_Stator'][1],-kv)+Affine2D().rotate_deg_around(0,0,-((360/bln)+(360/bln*(lay-1))))+Affine2D().rotate_deg_around(p['Pos_Stator'][0],p['Pos_Stator'][1],kv)).transform_point(p['pe'])
+                        get.append(math.hypot(ct2[0]-ct[0], ct2[1]-ct[1]))
+            gb.append(min(gs)-0.1)
+        gv = min(get)-0.2
+        def draw_g(y, l, v):
+            col = 'k' if v > 0 else 'r'; ax2.text(-3.5, y, f"{l} = {round(v, 4)}" if v > 0 else "Error", color=col, fontsize=10)
+        draw_g(1.5, "gap[overlap]", gb[0]); draw_g(1.0, "gap[collision]", gb[1]); draw_g(0.5, "gap[edge]", gv)
+        ax2.set_xlim(-4,2); ax2.set_ylim(-4,2); ax2.set_aspect('equal'); st.pyplot(f2)
+
+    # 3. Aperture
+    with c3:
+        st.subheader("3. Aperture Shape")
+        f3,ax3 = plt.subplots(figsize=(8,8))
+        cur_ap = compute_ap_at_k(cfg['h']/10, p, bln, rp)
+        if cur_ap:
+            for i in range(bln): ax3.add_line(Line2D(cur_ap['ax'], cur_ap['ay'], transform=Affine2D().rotate_deg_around(0,0,(360/bln)*i)+ax3.transData, color='k'))
+            ax3.scatter(*cur_ap['inter'], color='g', marker='x')
+            ax3.text(0,3.5,f"inner_circle = {round(2*cur_ap['r_in'],4)}", ha='center'); ax3.text(0,3.0,f"roundness = {round(cur_ap['r_in']/cur_ap['r_out'],4)}", ha='center')
+            ax3.add_patch(patches.Circle([0,0], cur_ap['r_in'], fc='none', ec='r'))
+        ax3.set_xlim(-4,4); ax3.set_ylim(-4,4); ax3.set_aspect('equal'); st.pyplot(f3)
+
+    # 4. Roundness
+    with c4:
+        st.subheader("4. Roundness Curve")
+        f4,ax4 = plt.subplots(figsize=(8,8))
+        cx,cy = [], []
+        for kv in np.linspace(0,10,30):
+            res = compute_ap_at_k(kv,p,bln,rp)
+            if res: cx.append(res['r_in']*2); cy.append(res['r_in']/res['r_out'])
+        ax4.plot(cx,cy,c='tab:blue')
+        if cur_ap: ax4.scatter(cur_ap['r_in']*2, cur_ap['r_in']/cur_ap['r_out'], color='r', marker='x')
+        ax4.set_xlim(1, 8); ax4.set_ylim(0.85, 1); ax4.grid(True, alpha=0.3); st.pyplot(f4)
+
+with tab2:
+    st.subheader("5. Pressure Angle Analysis")
+    f5,ax5 = plt.subplots(figsize=(10,10))
+    tr1 = Affine2D().rotate_deg_around(p['Pos_Stator'][0], p['Pos_Stator'][1], p['Ang_Rot_Limit'])
+    tr2 = Affine2D().rotate_deg_around(0, 0, 10); tr3 = Affine2D().rotate_deg_around(0, 0, p['Ang_Stator'] + 2*p['Ang_Rotor'])
+    cv2 = np.clip(2*((p['Dia_Max']-p['Dia_Min'])/4)/(2*p['Radius_Stator'])-np.cos(np.deg2rad(90-180/bln-p['Ang_B2'])), -1, 1)
+    arl2 = 180-2*((np.rad2deg(np.arccos(cv2))+90-180/bln-p['Ang_B2'])/2); tr1_1 = Affine2D().rotate_deg_around(p['Pos_Stator'][0], p['Pos_Stator'][1], arl2); tr2_1 = Affine2D().rotate_deg_around(0, 0, 5)
+    
+    def get_pts(step_tr, rot_tr):
+        s_d = ax5.transData.inverted().transform((rot_tr + step_tr + ax5.transData).transform_point(p['Pos_Rotor']))
+        c_d = ax5.transData.inverted().transform((step_tr + ax5.transData).transform_point([0,0]))
+        return s_d, c_d
+
+    pts_s1, pts_c1 = get_pts(Affine2D(), tr3)
+    pts_s3, pts_c3 = get_pts(tr1, (tr3-tr2 if rev_s else tr3+tr2))
+    pts_s2, pts_c2 = get_pts(tr1_1, (tr3-tr2_1 if rev_s else tr3+tr2_1))
+    
+    res_c = circle_from_3pts(pts_s1, pts_s2, pts_s3)
+    if res_c:
+        cen, rad = res_c; angs = [np.arctan2(pt[1]-cen[1], pt[0]-cen[0]) for pt in [pts_s1, pts_s2, pts_s3]]
+        a_min, a_max = min(angs), max(angs)
+        if a_max - a_min > np.pi: a_max, a_min = a_min + 2*np.pi, a_max
+        ax5.plot(cen[0]+rad*np.cos(np.linspace(a_min, a_max, 100)), cen[1]+rad*np.sin(np.linspace(a_min, a_max, 100)), color='m', lw=1.2)
+        ax5.scatter(*cen, color='c', s=30); ax5.text(cen[0], cen[1]+0.3, 'SLT Center', color='c', fontsize=8, weight='bold')
+        for i, (s_d, c_d) in enumerate([(pts_s1, pts_c1), (pts_s2, pts_c2), (pts_s3, pts_c3)]):
+            ax5.add_line(Line2D([0, s_d[0]], [0, s_d[1]], c='k', lw=0.8)) # Black Rotor Arm
+            normal_vec = cen - s_d; normal_unit = normal_vec/np.linalg.norm(normal_vec)
+            pa_val = angle_3pts(c_d, s_d, cen)
+            if pa_val > 90: pa_val = 180 - pa_val
+            ax5.text(s_d[0]-0.5, s_d[1], f"{pa_val:.2f}°", color="#c62828", fontsize=10, weight='bold')
+            ax5.arrow(s_d[0], s_d[1], normal_unit[0]*0.5, normal_unit[1]*0.5, head_width=0.1, fc='orange', ec='orange', length_includes_head=True)
+            ax5.text(s_d[0]+normal_unit[0]*0.6, s_d[1]+normal_unit[1]*0.6, f"n{i+1}", color='orange', fontsize=9, weight='bold')
+    ax5.set_xlim(-9, 9); ax5.set_ylim(-9, 9); ax5.set_aspect('equal'); ax5.grid(True, alpha=0.2); st.pyplot(f5)
+            `,
+          },
+        },
+        document.getElementById("root")
+      );
+    </script>
+  </body>
+</html>

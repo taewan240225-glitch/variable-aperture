@@ -1,320 +1,2500 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-    <title>Variable_Aperture</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@stlite/mountable@0.39.0/build/stlite.css" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Variable_Aperture_Design</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f7f6;
+        --surface: #ffffff;
+        --panel: #fbfcfb;
+        --ink: #1f2624;
+        --muted: #64706b;
+        --line: #d9e0dc;
+        --stator: #0f766e;
+        --rotor: #2563eb;
+        --focus: #c2410c;
+        --axis: #8b9a93;
+        --shadow: 0 12px 30px rgba(31, 38, 36, 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        letter-spacing: 0;
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      .shell {
+        min-height: 100vh;
+        display: grid;
+        grid-template-rows: auto 1fr;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 16px 22px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        position: sticky;
+        top: 0;
+        z-index: 5;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(21px, 2.4vw, 30px);
+        font-weight: 760;
+      }
+
+      .button {
+        min-height: 36px;
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+        color: var(--ink);
+        cursor: pointer;
+      }
+
+      .button.primary {
+        border-color: var(--stator);
+        background: var(--stator);
+        color: #fff;
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: minmax(270px, 340px) 1fr;
+        gap: 16px;
+        padding: 16px;
+      }
+
+      .controls,
+      .panel,
+      .data-panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      .controls {
+        align-self: start;
+        position: sticky;
+        top: 84px;
+        max-height: calc(100vh - 104px);
+        overflow: auto;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        min-height: 48px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .graph-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .icon-button {
+        min-width: 28px;
+        height: 28px;
+        padding: 0 7px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--surface);
+        color: var(--ink);
+        cursor: pointer;
+        line-height: 1;
+      }
+
+      h2 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 760;
+      }
+
+      .tag {
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .control-list {
+        display: grid;
+        gap: 14px;
+        padding: 14px;
+      }
+
+      .control {
+        display: grid;
+        gap: 7px;
+      }
+
+      .control label {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 680;
+      }
+
+      .control-row {
+        display: grid;
+        grid-template-columns: 1fr 90px;
+        gap: 9px;
+        align-items: center;
+      }
+
+      input[type="range"] {
+        width: 100%;
+        accent-color: var(--stator);
+      }
+
+      input[type="number"] {
+        width: 90px;
+        min-height: 32px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 5px 7px;
+        text-align: right;
+        color: var(--ink);
+        background: var(--panel);
+      }
+
+      input[type="checkbox"] {
+        accent-color: var(--stator);
+      }
+
+      .constraint-list {
+        display: grid;
+        gap: 9px;
+        padding: 14px;
+        border-top: 1px solid var(--line);
+      }
+
+      .constraint-item {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 8px;
+        align-items: flex-start;
+        padding: 9px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      .constraint-item input {
+        margin-top: 2px;
+      }
+
+      .constraint-title {
+        display: block;
+        font-size: 13px;
+        font-weight: 720;
+      }
+
+      .constraint-note {
+        display: block;
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.35;
+      }
+
+      .constraint-status {
+        color: var(--stator);
+        font-size: 12px;
+        font-weight: 760;
+        white-space: nowrap;
+      }
+
+      .constraint-status.ng {
+        color: #dc2626;
+      }
+
+      .constraint-status.off {
+        color: var(--muted);
+      }
+
+      .pin-list {
+        display: grid;
+        gap: 10px;
+        padding: 14px;
+        border-top: 1px solid var(--line);
+      }
+
+      .pin-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .pin-actions .button {
+        min-height: 30px;
+        padding: 5px 9px;
+        font-size: 12px;
+      }
+
+      .pin-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 7px;
+      }
+
+      .pin-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 30px;
+        padding: 6px 7px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--panel);
+        font-size: 12px;
+        font-weight: 680;
+      }
+
+      .graphs {
+        min-width: 0;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(320px, 1fr));
+        gap: 16px;
+      }
+
+      .canvas-wrap {
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        background: var(--panel);
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        cursor: grab;
+        touch-action: none;
+      }
+
+      canvas:active {
+        cursor: grabbing;
+      }
+
+      .legend {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        padding: 10px 14px 13px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .swatch {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+
+      .swatch.stator {
+        background: var(--stator);
+      }
+
+      .swatch.rotor {
+        background: var(--rotor);
+      }
+
+      .swatch.focus {
+        background: var(--focus);
+      }
+
+      .swatch.df {
+        background: rgba(31, 38, 36, 0.35);
+      }
+
+      .swatch.leaf-limit {
+        background: rgba(8, 145, 178, 0.42);
+      }
+
+      .swatch.sl {
+        background: #7c3aed;
+      }
+
+      .data-panel {
+        grid-column: 1 / -1;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: right;
+        font-size: 13px;
+      }
+
+      th:first-child,
+      td:first-child {
+        text-align: left;
+      }
+
+      th {
+        background: #eef3f0;
+        color: var(--muted);
+        font-weight: 720;
+      }
+
+      @media (max-width: 1040px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+
+        .controls {
+          position: static;
+          max-height: none;
+        }
+      }
+
+      @media (max-width: 760px) {
+        header {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        main {
+          padding: 12px;
+        }
+
+        .graphs {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
-    <script src="https://cdn.jsdelivr.net/npm/@stlite/mountable@0.39.0/build/stlite.js"></script>
+    <div class="shell">
+      <header>
+        <h1>Variable_Aperture_Design</h1>
+        <button class="button primary" id="resetButton" type="button">Reset Defaults</button>
+      </header>
+
+      <main>
+        <aside class="controls" aria-label="Input variables">
+          <div class="section-head">
+            <h2>Input Variables</h2>
+            <span class="tag">mm / deg</span>
+          </div>
+          <div class="control-list" id="controls"></div>
+          <div class="section-head">
+            <h2>Leaf Pins</h2>
+            <span class="tag">SL0 to SL4</span>
+          </div>
+          <div class="pin-list" id="pinControls"></div>
+          <div class="section-head">
+            <h2>Constraints</h2>
+            <span class="tag">solver / input</span>
+          </div>
+          <div class="constraint-list" id="constraintControls"></div>
+        </aside>
+
+        <section class="graphs">
+          <article class="panel">
+            <div class="section-head">
+              <h2>Variable Aperture</h2>
+              <div class="graph-actions">
+                <span class="tag" id="apertureTag">-</span>
+                <button class="icon-button" type="button" data-zoom-target="aperture" data-zoom-action="out" title="Zoom out">-</button>
+                <button class="icon-button" type="button" data-zoom-target="aperture" data-zoom-action="in" title="Zoom in">+</button>
+                <button class="icon-button" type="button" data-zoom-target="aperture" data-zoom-action="reset" title="Reset zoom">1:1</button>
+              </div>
+            </div>
+            <div class="canvas-wrap">
+              <canvas id="apertureCanvas" aria-label="Variable aperture graph"></canvas>
+            </div>
+            <div class="legend">
+              <span><i class="swatch stator"></i>Stator pins</span>
+              <span><i class="swatch rotor"></i>Rotor pins</span>
+              <span><i class="swatch focus"></i>Leaf reference</span>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="section-head">
+              <h2>Leaf</h2>
+              <div class="graph-actions">
+                <span class="tag" id="leafTag">-</span>
+                <button class="icon-button" type="button" data-zoom-target="leaf" data-zoom-action="out" title="Zoom out">-</button>
+                <button class="icon-button" type="button" data-zoom-target="leaf" data-zoom-action="in" title="Zoom in">+</button>
+                <button class="icon-button" type="button" data-zoom-target="leaf" data-zoom-action="reset" title="Reset zoom">1:1</button>
+              </div>
+            </div>
+            <div class="canvas-wrap">
+              <canvas id="leafCanvas" aria-label="Leaf reference graph"></canvas>
+            </div>
+            <div class="legend">
+              <span><i class="swatch stator"></i>Reference stator pin</span>
+              <span><i class="swatch rotor"></i>Corresponding rotor pin</span>
+              <span><i class="swatch df"></i>D_F circles</span>
+              <span><i class="swatch leaf-limit"></i>Leaf limit circles</span>
+              <span><i class="swatch sl"></i>SL points</span>
+            </div>
+          </article>
+
+          <section class="data-panel">
+            <div class="section-head">
+              <h2>Reference Coordinates</h2>
+              <span class="tag" id="coordinateTag">-</span>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Point</th>
+                  <th>Index</th>
+                  <th>X (mm)</th>
+                  <th>Y (mm)</th>
+                  <th>Angle / Note</th>
+                </tr>
+              </thead>
+              <tbody id="coordinateRows"></tbody>
+            </table>
+          </section>
+        </section>
+      </main>
+    </div>
+
     <script>
-      stlite.mount(
+      const DEG = Math.PI / 180;
+      const TAU = Math.PI * 2;
+
+      const inputDefs = [
+        { key: "Rs", label: "Rs", unit: "mm", min: 1, max: 20, step: 0.1, value: 7.6 },
+        { key: "Rr", label: "Rr", unit: "mm", min: 1, max: 20, step: 0.1, value: 6.2 },
+        { key: "Pin_Num", label: "Pin_Num", unit: "ea", min: 3, max: 36, step: 1, value: 9 },
+        { key: "Pin_Size", label: "Pin_Size", unit: "mm dia", min: 0.05, max: 2, step: 0.01, value: 0.4 },
+        { key: "theta_sr", label: "theta_sr", unit: "deg", min: -180, max: 180, step: 0.1, value: 14.7 },
+        { key: "SL0_theta", label: "SL0 theta", unit: "deg", min: -180, max: 180, step: 0.1, value: 14 },
+        { key: "SL4_theta", label: "SL4 theta", unit: "deg", min: -180, max: 180, step: 0.1, value: 28 },
+        { key: "D_F1_47", label: "D_F1.47", unit: "mm dia", min: 0.1, max: 20, step: 0.01, value: 7.83 },
+        { key: "D_F1_7", label: "D_F1.7", unit: "mm dia", min: 0.1, max: 20, step: 0.01, value: 6.52 },
+        { key: "D_F4_0", label: "D_F4.0", unit: "mm dia", min: 0.1, max: 20, step: 0.01, value: 2.78 },
+        { key: "D_F6_0", label: "D_F6.0", unit: "mm dia", min: 0.1, max: 20, step: 0.01, value: 2.2 },
+        { key: "Leaf_max", label: "Leaf_max", unit: "mm dia", min: 0.1, max: 40, step: 0.01, value: 16.5 },
+        { key: "theta_1", label: "theta_1", unit: "deg", min: -180, max: 180, step: 0.1, value: 20 },
+        { key: "theta_2", label: "theta_2", unit: "deg", min: -180, max: 180, step: 0.1, value: 30 },
+        { key: "ex_line", label: "ex_line", unit: "mm", min: 0, max: 5, step: 0.01, value: 0.55 },
+        { key: "Pressure_angle", label: "Pressure angle", unit: "deg", min: 0, max: 89, step: 0.1, value: 30 }
+      ];
+
+      const defaults = Object.fromEntries(inputDefs.map((item) => [item.key, item.value]));
+      const state = { ...defaults };
+      const ARC_TANGENCY_TOLERANCE = 0.02;
+      const HARD_CONSTRAINT_PENALTY = 1e12;
+      const constraintDefs = [
         {
-          requirements: ["numpy", "pandas", "matplotlib", "xlsxwriter"],
-          entrypoint: "app.py",
-          files: {
-            "app.py": `
-import streamlit as st
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-from matplotlib.transforms import Affine2D
-from matplotlib.lines import Line2D
-import math
-
-# --- Utils ---
-def rotMat3(base_pos, moved_pos, theta):
-    rad = np.deg2rad(theta)
-    return [
-        base_pos[0] + np.cos(rad) * (moved_pos[0] - base_pos[0]) - np.sin(rad) * (moved_pos[1] - base_pos[1]),
-        base_pos[1] + np.sin(rad) * (moved_pos[0] - base_pos[0]) + np.cos(rad) * (moved_pos[1] - base_pos[1])
-    ]
-
-def line_intersection(a1, b1, a2, b2):
-    for i in range(len(a1) - 1):
-        for j in range(len(a2) - 1):
-            x1, y1, x2, y2 = a1[i], b1[i], a1[i+1], b1[i+1]
-            x3, y3, x4, y4 = a2[j], b2[j], a2[j+1], b2[j+1]
-            denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
-            if denom == 0: continue
-            ix = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / denom
-            iy = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / denom
-            if (min(x1, x2) <= ix <= max(x1, x2) and min(y1, y2) <= iy <= max(y1, y2) and
-                min(x3, x4) <= ix <= max(x3, x4) and min(y3, y4) <= iy <= max(y3, y4)):
-                return (ix, iy)
-    return None
-
-def point_to_segment_distance(x1, y1, x2, y2, a, b):
-    dx, dy = x2 - x1, y2 - y1
-    l2 = dx**2 + dy**2
-    if l2 == 0: return math.hypot(a - x1, b - y1)
-    t = max(0, min(1, ((a - x1) * dx + (b - y1) * dy) / l2))
-    return math.hypot(a - (x1 + t * dx), b - (y1 + t * dy))
-
-def point_to_arc_distance(px, py, cx, cy, r, t1, t2):
-    dx, dy = px - cx, py - cy
-    dist = math.sqrt(dx**2 + dy**2)
-    ang = math.degrees(math.atan2(dy, dx)) % 360
-    if t1 <= ang <= t2: return abs(dist - r)
-    s_x, s_y = cx + r*math.cos(math.radians(t1)), cy + r*math.sin(math.radians(t1))
-    e_x, e_y = cx + r*math.cos(math.radians(t2)), cy + r*math.sin(math.radians(t2))
-    return min(math.hypot(px-s_x, py-s_y), math.hypot(px-e_x, py-e_y))
-
-def circumcircle(points):
-    return max([math.sqrt(x ** 2 + y ** 2) for x, y in points])
-
-def circle_from_3pts(P, Q, R):
-    x1, y1 = P; x2, y2 = Q; x3, y3 = R
-    a, b, c, d = x2-x1, y2-y1, x3-x1, y3-y1
-    det = 2*(a*d - b*c)
-    if np.isclose(det, 0.0): return None
-    e, f = a*(x1+x2)+b*(y1+y2), c*(x1+x3)+d*(y1+y3)
-    cx, cy = (d*e-b*f)/det, (-c*e+a*f)/det
-    return np.array([cx, cy]), np.hypot(cx-x1, cy-y1)
-
-def angle_3pts(A, B, C):
-    u, v = A-B, C-B
-    nu, nv = np.linalg.norm(u), np.linalg.norm(v)
-    if nu < 1e-12 or nv < 1e-12: return 0.0
-    return np.degrees(np.arccos(np.clip(np.dot(u, v)/(nu*nv), -1.0, 1.0)))
-
-def get_params(c_d):
-    a,b,c,d,e,f,g,h,i,j,k,m = [c_d[key] for key in ['a','b','c','d','e','f','g','h','i','j','k','m']]
-    R_S, R_R = c/100, d/100
-    D_M, D_m = j/100, k/1000
-    BLN = int(b)
-    A_S, A_SH = 270-180/BLN, 90-180/BLN
-    A_R, A_B1, A_B2 = a/20, f/10, e/10
-    cv = np.clip(2*((D_M-D_m)/2)/(2*R_S)-np.cos(np.deg2rad(A_SH-A_B2)), -1, 1)
-    A_L = (np.rad2deg(np.arccos(cv))+A_SH-A_B2)/2
-    A_RL = 180-2*A_L
-    P_S = [R_S*np.cos(np.deg2rad(A_S)), R_S*np.sin(np.deg2rad(A_S))]
-    P_R = [R_R*np.cos(np.deg2rad(A_R)), R_R*np.sin(np.deg2rad(A_R))]
-    p2 = [D_m/2*np.cos(np.deg2rad(A_B1)), D_m/2*np.sin(np.deg2rad(A_B1))]
-    p3 = [D_m/2*np.cos(np.deg2rad(A_B2)), D_m/2*np.sin(np.deg2rad(A_B2))]
-    p1 = [p2[0]-(g/100)*np.sin(np.deg2rad(A_B1)), p2[1]+(g/100)*np.cos(np.deg2rad(A_B1))]
-    pe = [(D_m/2+0.1)*np.cos(np.deg2rad(A_B1))-(g/100)*np.sin(np.deg2rad(A_B1)), (D_m/2+0.1)*np.sin(np.deg2rad(A_B1))+(g/100)*np.cos(np.deg2rad(A_B1))]
-    p4 = [p3[0]+(((D_M-D_m)/2)*np.tan(np.deg2rad(A_SH-A_B2-A_L)))*np.cos(np.deg2rad(270+A_B2)), p3[1]+(((D_M-D_m)/2)*np.tan(np.deg2rad(A_SH-A_B2-A_L)))*np.sin(np.deg2rad(270+A_B2))]
-    p5 = [pe[0]+0.1*np.cos(np.deg2rad(A_B1+30)), pe[1]+0.1*np.sin(np.deg2rad(A_B1+30))]
-    p6 = [p5[0]+1.5*np.cos(np.deg2rad(A_B1-60)), p5[1]+1.5*np.sin(np.deg2rad(A_B1-60))]
-    return {
-        'Radius_Stator':R_S, 'Radius_Rotor':R_R, 'Dia_Max':D_M, 'Dia_Min':D_m, 'Blade_N':BLN,
-        'Ang_Stator':A_S, 'Ang_Stator_H':A_SH, 'Ang_Rotor':A_R, 'Ang_B1':A_B1, 'Ang_B2':A_B2, 'Ang_B3':-60,
-        'Pos_Stator':P_S, 'Pos_Rotor':P_R, 'Ang_Rot_Limit':A_RL, 'p1':p1, 'p2':p2, 'p3':p3, 'p4':p4, 'p5':p5, 'p6':p6, 'pe':pe,
-        'Size_Max': 12.33, 'Size_Min': 6.47, 'R_Edge':0.1, 'm': m, 'Ang_Line': A_L
-    }
-
-def compute_ap_at_k(kv, p_d, bln, r_p):
-    h_r = -p_d['Ang_Rot_Limit']/10*kv
-    bp = []
-    for x,y in r_p:
-        xs,ys = x-p_d['Pos_Stator'][0], y-p_d['Pos_Stator'][1]
-        bp.append((xs*np.cos(np.deg2rad(h_r))-ys*np.sin(np.deg2rad(h_r))+p_d['Pos_Stator'][0], xs*np.sin(np.deg2rad(h_r))+ys*np.cos(np.deg2rad(h_r))+p_d['Pos_Stator'][1]))
-    ar = 360/bln
-    ap = [(xr*np.cos(np.deg2rad(ar))-yr*np.sin(np.deg2rad(ar)), xr*np.sin(np.deg2rad(ar))+yr*np.cos(np.deg2rad(ar))) for xr,yr in bp]
-    bx,by = zip(*bp); ax,ay = zip(*ap); inter = None; ci = cj = 0
-    for i in range(len(bx)-1):
-        for j in range(len(ax)-1):
-            res = line_intersection([bx[i],bx[i+1]],[by[i],by[i+1]],[ax[j],ax[j+1]],[ay[j],ay[j+1]])
-            if res: inter = res; ci,cj = i+1,j+1; break
-        if inter: break
-    if not inter: return None
-    ax_l = (inter[0],)+bx[ci:cj]+(rotMat3([0,0],[inter[0],inter[1]],-ar)[0],)
-    ay_l = (inter[1],)+by[ci:cj]+(rotMat3([0,0],[inter[0],inter[1]],-ar)[1],)
-    r_in = min([point_to_segment_distance(ax_l[i],ay_l[i],ax_l[i+1],ay_l[i+1],0,0) for i in range(len(ax_l)-1)])
-    r_out = min(circumcircle(list(zip(ax_l, ay_l))), p_d['m']/200)
-    return {'r_in': r_in, 'r_out': r_out, 'inter': inter, 'ax': ax_l, 'ay': ay_l}
-
-# --- App UI ---
-st.set_page_config(layout="wide")
-st.title("Variable_Aperture")
-
-with st.sidebar:
-    st.header("Settings")
-    
-    def linked_input(label, min_val, max_val, default_val, step=0.01, is_int=False):
-        st.markdown(f"**{label}**")
-        key = f"val_{label}"
-        if key not in st.session_state:
-            st.session_state[key] = float(default_val) if not is_int else int(default_val)
-        
-        col1, col2 = st.columns([2, 1])
-        
-        def update_s():
-            st.session_state[key] = st.session_state[f"n_{label}"]
-        def update_n():
-            st.session_state[key] = st.session_state[f"s_{label}"]
-        
-        # Ensure the value is within bounds for the slider
-        current_val = st.session_state[key]
-        if is_int:
-            s_val = col1.slider(label, int(min_val), int(max_val), value=int(current_val), key=f"s_{label}", on_change=update_n, label_visibility="collapsed")
-            n_val = col2.number_input(label, int(min_val), int(max_val), value=int(current_val), key=f"n_{label}", on_change=update_s, label_visibility="collapsed")
-        else:
-            s_val = col1.slider(label, float(min_val), float(max_val), step=float(step), value=float(current_val), key=f"s_{label}", on_change=update_n, label_visibility="collapsed")
-            n_val = col2.number_input(label, float(min_val), float(max_val), step=float(step), value=float(current_val), key=f"n_{label}", on_change=update_s, label_visibility="collapsed")
-        
-        return st.session_state[key]
-
-    a_s = linked_input("Slot Angle", -50.0, 50.0, -41.0)*10
-    b_s = linked_input("Blade N", 4, 10, 9, is_int=True)
-    c_s = linked_input("Radius Stator", 5.1, 10.0, 6.9)*100
-    d_s = linked_input("Radius Rotor", 4.0, 9.5, 5.8)*100
-    e_s = linked_input("Blade Angle2", -80.0, 20.0, -30.0)*10
-    f_s = linked_input("Blade Angle1", -60.0, 30.0, -7.0)*10
-    g_s = linked_input("Ext Length", 0.0, 3.0, 1.0)*100
-    h_s = linked_input("Rotation Rotor", 0.0, 10.0, 0.0)*10
-    i_s = linked_input("Layer", 2, 4, 3, is_int=True)
-    j_s = linked_input("Aperture Max", 4.0, 9.0, 8.12)*100
-    k_s = linked_input("Aperture Min", 1.0, 3.0, 1.93)*1000
-    m_s = linked_input("Soma", 5.0, 8.0, 7.82)*100
-    
-    rev_s = st.checkbox("Reverse Slot")
-    line_b = st.checkbox("Line Blade")
-    
-    if line_b:
-        f_s = e_s
-        
-    cfg = {
-        'a': a_s, 'b': b_s, 'c': c_s, 'd': d_s, 'e': e_s, 'f': f_s,
-        'g': g_s, 'h': h_s, 'i': i_s, 'j': j_s, 'k': k_s, 'm': m_s
-    }
-
-p = get_params(cfg)
-# DEFINE RP BEFORE USE
-p23_pts = [(p['Dia_Min']/2*np.cos(np.deg2rad(a)), p['Dia_Min']/2*np.sin(np.deg2rad(a))) for a in np.linspace(p['Ang_B1'], p['Ang_B2'], 30)]
-cs_c = rotMat3(p['Pos_Stator'], [0, 0], p['Ang_Rot_Limit'])
-p45_pts = [(cs_c[0]+p['Dia_Max']/2*np.cos(np.deg2rad(a)), cs_c[1]+p['Dia_Max']/2*np.sin(np.deg2rad(a))) for a in np.linspace(p['Ang_B2'], p['Ang_B2']+p['Ang_B3'], 30)]
-rp = [tuple(p['p1'])] + p23_pts + p45_pts
-
-tab1, tab2 = st.tabs(["Design (4-Graphs)", "Pressure Angle Analysis"])
-
-with tab1:
-    c1,c2 = st.columns(2); c3,c4 = st.columns(2)
-    # 1. Iris
-    with c1:
-        st.subheader("1. Iris Layout")
-        f1,ax1 = plt.subplots(figsize=(8,8))
-        ax1.add_patch(patches.Circle([0,0], p['Dia_Min']/2, fc='none', ec='k', ls='--', alpha=0.3))
-        ax1.add_patch(patches.Circle([0,0], p['Dia_Max']/2, fc='none', ec='k', ls='--', alpha=0.3))
-        ax1.add_patch(patches.Circle([0,0], p['Size_Max']/2, fc='none', ec='y', ls='-', alpha=1))
-        ax1.add_patch(patches.Circle([0,0], p['Size_Min']/2, fc='none', ec='y', ls='-', alpha=1))
-        for i in range(int(cfg['b'])):
-            tr_slot = Affine2D().rotate_deg_around(0,0, (360/int(cfg['b']))*(i+1))
-            ax1.add_patch(patches.Arc([0,0], 2*p['Radius_Rotor'], 2*p['Radius_Rotor'], theta1=p['Ang_Stator']+p['Ang_Rotor']*2-(10.0 if rev_s else 0), theta2=p['Ang_Stator']+p['Ang_Rotor']*2+(0 if rev_s else 10.0), ec='r', transform=tr_slot+ax1.transData))
-        colors=['k','b','g','r']; lay, bln = int(cfg['i']), int(cfg['b'])
-        for li in range(lay):
-            for bi in range(bln//lay):
-                tc = Affine2D().rotate_deg_around(0,0,(360/bln)*(lay*bi+1+li))
-                ts = Affine2D().rotate_deg_around(p['Pos_Stator'][0], p['Pos_Stator'][1], -p['Ang_Rot_Limit']/10*cfg['h']/10)
-                tr4 = Affine2D().rotate_deg_around(0,0,p['Ang_Stator']+p['Ang_Rotor']+(360/bln)*(lay*bi+1+li)+cfg['h']/10)
-                comb = ts+tc+ax1.transData
-                ax1.add_patch(patches.Circle(p['Pos_Rotor'], 0.25, fc=colors[li%4], alpha=0.5, transform=tr4+ax1.transData))
-                ax1.add_patch(patches.Circle(p['Pos_Stator'], 0.25, fc=colors[li%4], alpha=0.5, transform=comb))
-                ax1.add_line(Line2D([p['p1'][0],p['p2'][0]],[p['p1'][1],p['p2'][1]], c=colors[li%4], transform=comb))
-                ax1.add_patch(patches.Arc([0,0], p['Dia_Min'], p['Dia_Min'], angle=p['Ang_B2'], theta1=0, theta2=p['Ang_B1']-p['Ang_B2'], ec=colors[li%4], transform=comb))
-                ax1.add_line(Line2D([p['p3'][0],p['p4'][0]],[p['p3'][1],p['p4'][1]], c=colors[li%4], transform=comb))
-                ax1.add_patch(patches.Arc(rotMat3(p['Pos_Stator'],[0,0],p['Ang_Rot_Limit']), p['Dia_Max'], p['Dia_Max'], angle=p['Ang_B2']+p['Ang_B3'], theta1=0, theta2=-p['Ang_B3'], ec=colors[li%4], transform=comb))
-                ax1.add_line(Line2D([p['p5'][0],p['p6'][0]],[p['p5'][1],p['p6'][1]], c=colors[li%4], transform=comb))
-                ax1.add_patch(patches.Arc(p['pe'], 0.2, 0.2, theta1=p['Ang_B1']+30, theta2=p['Ang_B1']+180, ec=colors[li%4], transform=comb))
-        ax1.set_xlim(-8,8); ax1.set_ylim(-8,8); ax1.set_aspect('equal'); st.pyplot(f1)
-
-    # 2. Blade & Gaps
-    with c2:
-        st.subheader("2. Blade & Gaps")
-        f2,ax2 = plt.subplots(figsize=(8,8))
-        ax2.add_line(Line2D([p['p1'][0],p['p2'][0]],[p['p1'][1],p['p2'][1]], c='k'))
-        ax2.add_patch(patches.Arc([0,0], p['Dia_Min'], p['Dia_Min'], angle=p['Ang_B2'], theta1=0, theta2=p['Ang_B1']-p['Ang_B2'], ec='k'))
-        ax2.add_line(Line2D([p['p3'][0],p['p4'][0]], [p['p3'][1],p['p4'][1]], c='k'))
-        ax2.add_patch(patches.Arc(rotMat3(p['Pos_Stator'],[0,0],p['Ang_Rot_Limit']), p['Dia_Max'], p['Dia_Max'], angle=p['Ang_B2']+p['Ang_B3'], theta1=0, theta2=-p['Ang_B3'], ec='k'))
-        ax2.add_line(Line2D([p['p5'][0],p['p6'][0]], [p['p5'][1],p['p6'][1]], c='k'))
-        ax2.add_patch(patches.Arc(p['pe'], 0.2, 0.2, theta1=p['Ang_B1']+30, theta2=p['Ang_B1']+180, ec='k'))
-        gb, get = [], []
-        ang_s = np.linspace(0, p['Ang_Rot_Limit'], 20)
-        for i in range(2):
-            gs = []
-            for j in ang_s:
-                tc = Affine2D().rotate_deg_around(p['Pos_Stator'][0],p['Pos_Stator'][1],-j)+Affine2D().rotate_deg_around(0,0,-((360/bln)+(360/bln*(lay-1)*i)))+Affine2D().rotate_deg_around(p['Pos_Stator'][0],p['Pos_Stator'][1],j)
-                ct = tc.transform_point(p['pe'])
-                ax2.add_patch(patches.Circle(p['pe'], 0.1, fc='none', ec='b' if i==0 else 'k', alpha=0.3, transform=tc+ax2.transData))
-                gs.extend([point_to_segment_distance(p['p3'][0],p['p3'][1],p['p4'][0],p['p4'][1],ct[0],ct[1]), point_to_arc_distance(ct[0],ct[1],p['Pos_Stator'][0],p['Pos_Stator'][1],p['Dia_Max']/2,(p['Ang_B2']-30)%360,p['Ang_B2']%360)])
-                if i==0:
-                    for kv in ang_s:
-                        ct2 = (Affine2D().rotate_deg_around(p['Pos_Stator'][0],p['Pos_Stator'][1],-kv)+Affine2D().rotate_deg_around(0,0,-((360/bln)+(360/bln*(lay-1))))+Affine2D().rotate_deg_around(p['Pos_Stator'][0],p['Pos_Stator'][1],kv)).transform_point(p['pe'])
-                        get.append(math.hypot(ct2[0]-ct[0], ct2[1]-ct[1]))
-            gb.append(min(gs)-0.1)
-        gv = min(get)-0.2
-        def draw_g(y, l, v):
-            col = 'k' if v > 0 else 'r'; ax2.text(-3.5, y, f"{l} = {round(v, 4)}" if v > 0 else "Error", color=col, fontsize=10)
-        draw_g(1.5, "gap[overlap]", gb[0]); draw_g(1.0, "gap[collision]", gb[1]); draw_g(0.5, "gap[edge]", gv)
-        ax2.set_xlim(-4,2); ax2.set_ylim(-4,2); ax2.set_aspect('equal'); st.pyplot(f2)
-
-    # 3. Aperture
-    with c3:
-        st.subheader("3. Aperture Shape")
-        f3,ax3 = plt.subplots(figsize=(8,8))
-        cur_ap = compute_ap_at_k(cfg['h']/10, p, bln, rp)
-        if cur_ap:
-            for i in range(bln): ax3.add_line(Line2D(cur_ap['ax'], cur_ap['ay'], transform=Affine2D().rotate_deg_around(0,0,(360/bln)*i)+ax3.transData, color='k'))
-            ax3.scatter(*cur_ap['inter'], color='g', marker='x')
-            ax3.text(0,3.5,f"inner_circle = {round(2*cur_ap['r_in'],4)}", ha='center'); ax3.text(0,3.0,f"roundness = {round(cur_ap['r_in']/cur_ap['r_out'],4)}", ha='center')
-            ax3.add_patch(patches.Circle([0,0], cur_ap['r_in'], fc='none', ec='r'))
-        ax3.set_xlim(-4,4); ax3.set_ylim(-4,4); ax3.set_aspect('equal'); st.pyplot(f3)
-
-    # 4. Roundness
-    with c4:
-        st.subheader("4. Roundness Curve")
-        f4,ax4 = plt.subplots(figsize=(8,8))
-        cx,cy = [], []
-        for kv in np.linspace(0,10,30):
-            res = compute_ap_at_k(kv,p,bln,rp)
-            if res: cx.append(res['r_in']*2); cy.append(res['r_in']/res['r_out'])
-        ax4.plot(cx,cy,c='tab:blue')
-        if cur_ap: ax4.scatter(cur_ap['r_in']*2, cur_ap['r_in']/cur_ap['r_out'], color='r', marker='x')
-        ax4.set_xlim(1, 8); ax4.set_ylim(0.85, 1); ax4.grid(True, alpha=0.3); st.pyplot(f4)
-
-with tab2:
-    st.subheader("5. Pressure Angle Analysis")
-    f5,ax5 = plt.subplots(figsize=(10,10))
-    tr1 = Affine2D().rotate_deg_around(p['Pos_Stator'][0], p['Pos_Stator'][1], p['Ang_Rot_Limit'])
-    tr2 = Affine2D().rotate_deg_around(0, 0, 10); tr3 = Affine2D().rotate_deg_around(0, 0, p['Ang_Stator'] + 2*p['Ang_Rotor'])
-    cv2 = np.clip(2*((p['Dia_Max']-p['Dia_Min'])/4)/(2*p['Radius_Stator'])-np.cos(np.deg2rad(90-180/bln-p['Ang_B2'])), -1, 1)
-    arl2 = 180-2*((np.rad2deg(np.arccos(cv2))+90-180/bln-p['Ang_B2'])/2); tr1_1 = Affine2D().rotate_deg_around(p['Pos_Stator'][0], p['Pos_Stator'][1], arl2); tr2_1 = Affine2D().rotate_deg_around(0, 0, 5)
-    
-    def get_pts(step_tr, rot_tr):
-        s_d = ax5.transData.inverted().transform((rot_tr + step_tr + ax5.transData).transform_point(p['Pos_Rotor']))
-        c_d = ax5.transData.inverted().transform((step_tr + ax5.transData).transform_point([0,0]))
-        return s_d, c_d
-
-    pts_s1, pts_c1 = get_pts(Affine2D(), tr3)
-    pts_s3, pts_c3 = get_pts(tr1, (tr3-tr2 if rev_s else tr3+tr2))
-    pts_s2, pts_c2 = get_pts(tr1_1, (tr3-tr2_1 if rev_s else tr3+tr2_1))
-    
-    res_c = circle_from_3pts(pts_s1, pts_s2, pts_s3)
-    if res_c:
-        cen, rad = res_c; angs = [np.arctan2(pt[1]-cen[1], pt[0]-cen[0]) for pt in [pts_s1, pts_s2, pts_s3]]
-        a_min, a_max = min(angs), max(angs)
-        if a_max - a_min > np.pi: a_max, a_min = a_min + 2*np.pi, a_max
-        ax5.plot(cen[0]+rad*np.cos(np.linspace(a_min, a_max, 100)), cen[1]+rad*np.sin(np.linspace(a_min, a_max, 100)), color='m', lw=1.2)
-        ax5.scatter(*cen, color='c', s=30); ax5.text(cen[0], cen[1]+0.3, 'SLT Center', color='c', fontsize=8, weight='bold')
-        for i, (s_d, c_d) in enumerate([(pts_s1, pts_c1), (pts_s2, pts_c2), (pts_s3, pts_c3)]):
-            ax5.add_line(Line2D([0, s_d[0]], [0, s_d[1]], c='k', lw=0.8)) # Black Rotor Arm
-            normal_vec = cen - s_d; normal_unit = normal_vec/np.linalg.norm(normal_vec)
-            pa_val = angle_3pts(c_d, s_d, cen)
-            if pa_val > 90: pa_val = 180 - pa_val
-            ax5.text(s_d[0]-0.5, s_d[1], f"{pa_val:.2f}°", color="#c62828", fontsize=10, weight='bold')
-            ax5.arrow(s_d[0], s_d[1], normal_unit[0]*0.5, normal_unit[1]*0.5, head_width=0.1, fc='orange', ec='orange', length_includes_head=True)
-            ax5.text(s_d[0]+normal_unit[0]*0.6, s_d[1]+normal_unit[1]*0.6, f"n{i+1}", color='orange', fontsize=9, weight='bold')
-    ax5.set_xlim(-9, 9); ax5.set_ylim(-9, 9); ax5.set_aspect('equal'); ax5.grid(True, alpha=0.2); st.pyplot(f5)
-            `,
-          },
+          key: "arcTangency",
+          label: "Arc1/Arc2 tangent at SL2",
+          note: "Arc1 and Arc2 share the same normal direction at SL2.",
+          enabled: true
         },
-        document.getElementById("root")
-      );
+        {
+          key: "arcCenterLeft",
+          label: "Arc centers left of SL2",
+          note: "Arc1.cx and Arc2.cx must be smaller than SL2.x.",
+          enabled: true
+        },
+        {
+          key: "thetaOrder",
+          label: "SL theta order",
+          note: "SL0 < SL1 < SL2 < SL3 < SL4.",
+          enabled: true
+        },
+        {
+          key: "pointXOrder",
+          label: "P x-order",
+          note: "P1.x > P2.x > P3.x > P4.x > P5.x.",
+          enabled: true
+        },
+        {
+          key: "dMinGtOne",
+          label: "D_min > 1.00mm",
+          note: "Computed D_min diameter must stay larger than 1.00mm.",
+          enabled: true
+        },
+        {
+          key: "diameterOrder",
+          label: "Diameter order",
+          note: "D_max > D_F1.47 > D_F1.7 > D_F4.0 > D_F6.0 > D_min.",
+          enabled: true
+        },
+        {
+          key: "dMinLeftArcTangent",
+          label: "D_min left line/arc tangent",
+          note: "D_min must stay on the D_F6.0 side of L1, left of P1, and tangent to the D_F6.0 arc.",
+          enabled: true
+        },
+        {
+          key: "pressureRange",
+          label: "Pressure angle range",
+          note: "Each epsilon must satisfy 0 < epsilon(+) < 90deg.",
+          enabled: true
+        },
+        {
+          key: "pressureTarget",
+          label: "Pressure angle target",
+          note: "SL0, SL2, and SL4 epsilon are solved toward Pressure angle.",
+          enabled: true,
+          blocking: false
+        }
+      ];
+      const constraintDefaults = Object.fromEntries(constraintDefs.map((item) => [item.key, item.enabled]));
+      const constraintState = { ...constraintDefaults };
+      const zoomState = { aperture: 1, leaf: 1 };
+      const panState = {
+        aperture: { x: 0, y: 0 },
+        leaf: { x: 0, y: 0 }
+      };
+      const renderState = {
+        aperture: { scale: 1 },
+        leaf: { scale: 1 }
+      };
+      const leafGeometryCache = { key: "", value: null };
+      const leafPinVisibility = {};
+      let pinControlSignature = "";
+      const controls = document.getElementById("controls");
+      const pinControls = document.getElementById("pinControls");
+      const constraintControls = document.getElementById("constraintControls");
+      const apertureCanvas = document.getElementById("apertureCanvas");
+      const leafCanvas = document.getElementById("leafCanvas");
+
+      function fmt(value, digits = 3) {
+        if (!Number.isFinite(value)) return "-";
+        return Number(value).toFixed(digits).replace(/\.?0+$/, "");
+      }
+
+      function rad(degrees) {
+        return degrees * DEG;
+      }
+
+      function constraintEnabled(key) {
+        return constraintState[key] !== false;
+      }
+
+      function activePenalty(key, penalty) {
+        return constraintEnabled(key) ? penalty : 0;
+      }
+
+      function pinAt(radius, angleFromY) {
+        return {
+          x: -radius * Math.sin(rad(angleFromY)),
+          y: radius * Math.cos(rad(angleFromY)),
+          angleFromY
+        };
+      }
+
+      function buildPins() {
+        const count = Math.max(3, Math.round(state.Pin_Num));
+        const step = 360 / count;
+        const stator = [];
+        const rotor = [];
+        for (let index = 0; index < count; index += 1) {
+          const statorAngle = index * step;
+          const rotorAngle = statorAngle + state.theta_sr;
+          stator.push({ ...pinAt(state.Rs, statorAngle), index, type: "Stator" });
+          rotor.push({ ...pinAt(state.Rr, rotorAngle), index, type: "Rotor" });
+        }
+        const reference = selectReference(stator);
+        return {
+          count,
+          step,
+          stator,
+          rotor,
+          reference,
+          referenceRotor: rotor[reference.index]
+        };
+      }
+
+      function ensureLeafPinVisibility(model) {
+        const keys = new Set();
+        for (let index = 0; index < model.count; index += 1) {
+          const key = String(index);
+          keys.add(key);
+          if (leafPinVisibility[key] === undefined) {
+            leafPinVisibility[key] = index === model.reference.index;
+          }
+        }
+        for (const key of Object.keys(leafPinVisibility)) {
+          if (!keys.has(key)) delete leafPinVisibility[key];
+        }
+      }
+
+      function visibleLeafPinIndices(model) {
+        ensureLeafPinVisibility(model);
+        return model.stator
+          .map((pin) => pin.index)
+          .filter((index) => leafPinVisibility[String(index)]);
+      }
+
+      function rotorPinAtDriveTheta(model, index, driveTheta) {
+        return {
+          ...pinAt(state.Rr, index * model.step + driveTheta),
+          index,
+          driveTheta
+        };
+      }
+
+      function dCenterStates(leaf) {
+        if (!leaf?.slPoints || leaf.slPoints.length < 5) return [];
+        const labels = ["D_min", "D_F6.0", "D_F1.7", "D_F1.47", "D_max"];
+        return leaf.slPoints.map((item, index) => ({
+          label: labels[index],
+          center: item.center,
+          theta: item.theta,
+          orderIndex: index
+        }));
+      }
+
+      function leafPinCorrection(model, center) {
+        return angleFromCenterToPoint(center, model.reference) - model.reference.index * model.step;
+      }
+
+      function leafStatorPinAtD(model, center, index) {
+        const correction = leafPinCorrection(model, center);
+        return {
+          ...pinFromCenter(center, state.Rs, index * model.step + correction),
+          index
+        };
+      }
+
+      function leafRotorPinAtD(model, center, index, driveTheta) {
+        const correction = leafPinCorrection(model, center);
+        return {
+          ...pinFromCenter(center, state.Rr, index * model.step + correction + driveTheta),
+          index,
+          driveTheta
+        };
+      }
+
+      function selectReference(statorPins) {
+        const thirdQuadrant = statorPins.filter((pin) => pin.x < 0 && pin.y < 0);
+        if (thirdQuadrant.length > 0) {
+          return thirdQuadrant.reduce((best, pin) => (pin.x > best.x ? pin : best), thirdQuadrant[0]);
+        }
+        return statorPins.reduce((best, pin) => {
+          const score = Math.abs(normalizeAngle(pin.angleFromY - 135));
+          return score < best.score ? { ...pin, score } : best;
+        }, { ...statorPins[0], score: Infinity });
+      }
+
+      function normalizeAngle(angle) {
+        return ((angle + 180) % 360 + 360) % 360 - 180;
+      }
+
+      function zoomedBounds(bounds, key) {
+        const zoom = zoomState[key] || 1;
+        const pan = panState[key] || { x: 0, y: 0 };
+        const centerX = (bounds.xMin + bounds.xMax) / 2 + pan.x;
+        const centerY = (bounds.yMin + bounds.yMax) / 2 + pan.y;
+        const width = (bounds.xMax - bounds.xMin) / zoom;
+        const height = (bounds.yMax - bounds.yMin) / zoom;
+        return {
+          xMin: centerX - width / 2,
+          xMax: centerX + width / 2,
+          yMin: centerY - height / 2,
+          yMax: centerY + height / 2
+        };
+      }
+
+      function changeZoom(target, action) {
+        if (action === "reset") {
+          zoomState[target] = 1;
+          panState[target].x = 0;
+          panState[target].y = 0;
+        } else {
+          const factor = action === "in" ? 1.2 : 1 / 1.2;
+          zoomState[target] = Math.max(0.4, Math.min(8, zoomState[target] * factor));
+        }
+        requestRender();
+      }
+
+      function panGraph(target, deltaX, deltaY) {
+        const scale = renderState[target]?.scale || 1;
+        panState[target].x -= deltaX / scale;
+        panState[target].y += deltaY / scale;
+        requestRender();
+      }
+
+      function setupCanvas(canvas, bounds) {
+        const ratio = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = Math.max(1, Math.floor(rect.width * ratio));
+        canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+        const ctx = canvas.getContext("2d");
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.scale(ratio, ratio);
+        const width = rect.width;
+        const height = rect.height;
+        const pad = 34;
+        const scale = Math.min((width - pad * 2) / (bounds.xMax - bounds.xMin), (height - pad * 2) / (bounds.yMax - bounds.yMin));
+        const cx = width / 2 - ((bounds.xMin + bounds.xMax) / 2) * scale;
+        const cy = height / 2 + ((bounds.yMin + bounds.yMax) / 2) * scale;
+        ctx.clearRect(0, 0, width, height);
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        return {
+          ctx,
+          width,
+          height,
+          scale,
+          point(point) {
+            return [cx + point.x * scale, cy - point.y * scale];
+          }
+        };
+      }
+
+      function drawGrid(view, bounds) {
+        const { ctx } = view;
+        ctx.save();
+        ctx.strokeStyle = "#e1e8e4";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        const spacing = 2;
+        for (let x = Math.ceil(bounds.xMin / spacing) * spacing; x <= bounds.xMax; x += spacing) {
+          const a = view.point({ x, y: bounds.yMin });
+          const b = view.point({ x, y: bounds.yMax });
+          ctx.moveTo(a[0], a[1]);
+          ctx.lineTo(b[0], b[1]);
+        }
+        for (let y = Math.ceil(bounds.yMin / spacing) * spacing; y <= bounds.yMax; y += spacing) {
+          const a = view.point({ x: bounds.xMin, y });
+          const b = view.point({ x: bounds.xMax, y });
+          ctx.moveTo(a[0], a[1]);
+          ctx.lineTo(b[0], b[1]);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = "#8b9a93";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(...view.point({ x: bounds.xMin, y: 0 }));
+        ctx.lineTo(...view.point({ x: bounds.xMax, y: 0 }));
+        ctx.moveTo(...view.point({ x: 0, y: bounds.yMin }));
+        ctx.lineTo(...view.point({ x: 0, y: bounds.yMax }));
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawCircle(view, center, radius, stroke, fill = "transparent", lineWidth = 1.5) {
+        const { ctx } = view;
+        const point = view.point(center);
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(point[0], point[1], Math.max(1, radius * view.scale), 0, TAU);
+        ctx.fillStyle = fill;
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = lineWidth;
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawLine(view, a, b, color, width = 1.5, dash = []) {
+        const { ctx } = view;
+        const start = view.point(a);
+        const end = view.point(b);
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.setLineDash(dash);
+        ctx.beginPath();
+        ctx.moveTo(start[0], start[1]);
+        ctx.lineTo(end[0], end[1]);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawPolyline(view, points, color, width = 1.5, dash = []) {
+        if (points.length < 2) return;
+        const { ctx } = view;
+        const first = view.point(points[0]);
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.setLineDash(dash);
+        ctx.beginPath();
+        ctx.moveTo(first[0], first[1]);
+        for (let index = 1; index < points.length; index += 1) {
+          const point = view.point(points[index]);
+          ctx.lineTo(point[0], point[1]);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawArcBetween(view, center, radius, startPoint, endPoint, color, clockwise = false) {
+        const start = Math.atan2(startPoint.y - center.y, startPoint.x - center.x);
+        let end = Math.atan2(endPoint.y - center.y, endPoint.x - center.x);
+        if (clockwise && end > start) end -= TAU;
+        if (!clockwise && end < start) end += TAU;
+        const steps = Math.max(10, Math.ceil(Math.abs(end - start) / (Math.PI / 36)));
+        const points = [];
+        for (let i = 0; i <= steps; i += 1) {
+          const angle = start + (end - start) * (i / steps);
+          points.push({
+            x: center.x + radius * Math.cos(angle),
+            y: center.y + radius * Math.sin(angle)
+          });
+        }
+        drawPolyline(view, points, color, 2);
+      }
+
+      function drawAngleArc(view, center, radius, startAngle, sweepAngle, color) {
+        const steps = Math.max(8, Math.ceil(Math.abs(sweepAngle) / (Math.PI / 36)));
+        const points = [];
+        for (let index = 0; index <= steps; index += 1) {
+          const angle = startAngle + sweepAngle * (index / steps);
+          points.push({
+            x: center.x + radius * Math.cos(angle),
+            y: center.y + radius * Math.sin(angle)
+          });
+        }
+        drawPolyline(view, points, color, 1.8);
+      }
+
+      function drawArcThroughPoints(view, startPoint, midPoint, endPoint, color) {
+        const circle = circleFrom3Points(startPoint, midPoint, endPoint);
+        if (!circle) return;
+        const radius = distance(circle.center, startPoint);
+        const start = Math.atan2(startPoint.y - circle.center.y, startPoint.x - circle.center.x);
+        const mid = Math.atan2(midPoint.y - circle.center.y, midPoint.x - circle.center.x);
+        const end = Math.atan2(endPoint.y - circle.center.y, endPoint.x - circle.center.x);
+        const ccw = angleBetween(start, end, mid, true);
+        let sweepEnd = end;
+        if (ccw && sweepEnd < start) sweepEnd += TAU;
+        if (!ccw && sweepEnd > start) sweepEnd -= TAU;
+        const steps = Math.max(12, Math.ceil(Math.abs(sweepEnd - start) / (Math.PI / 48)));
+        const points = [];
+        for (let index = 0; index <= steps; index += 1) {
+          const angle = start + (sweepEnd - start) * (index / steps);
+          points.push({
+            x: circle.center.x + radius * Math.cos(angle),
+            y: circle.center.y + radius * Math.sin(angle)
+          });
+        }
+        drawPolyline(view, points, color, 2.2);
+      }
+
+      function angleBetween(start, end, angle, ccw) {
+        const norm = (value) => ((value % TAU) + TAU) % TAU;
+        const s = norm(start);
+        const e = norm(end);
+        const a = norm(angle);
+        if (ccw) {
+          const span = norm(e - s);
+          const delta = norm(a - s);
+          return delta <= span + 1e-9;
+        }
+        const span = norm(s - e);
+        const delta = norm(s - a);
+        return delta <= span + 1e-9;
+      }
+
+      function drawLabel(view, point, text, color, dx = 6, dy = -6) {
+        const { ctx } = view;
+        const p = view.point(point);
+        ctx.save();
+        ctx.fillStyle = color;
+        ctx.font = "12px system-ui, sans-serif";
+        ctx.fillText(text, p[0] + dx, p[1] + dy);
+        ctx.restore();
+      }
+
+      function drawDfCircle(view, center, diameter, label) {
+        drawCircle(view, center, diameter / 2, "rgba(31, 38, 36, 0.42)", "transparent", 1.8);
+        drawCircle(view, center, 0.045, "rgba(31, 38, 36, 0.55)", "rgba(31, 38, 36, 0.55)", 1);
+        drawLabel(view, center, label, "rgba(31, 38, 36, 0.72)", 8, -8);
+      }
+
+      function drawComputedDiameterCircle(view, circle, label) {
+        drawCircle(view, circle.center, circle.radius, "rgba(31, 38, 36, 0.42)", "transparent", 1.8);
+        drawCircle(view, circle.center, 0.045, "rgba(31, 38, 36, 0.55)", "rgba(31, 38, 36, 0.55)", 1);
+        drawLabel(view, circle.center, `${label}=${fmt(circle.radius * 2, 3)}`, "rgba(31, 38, 36, 0.72)", 8, -8);
+      }
+
+      function drawLeafLimitCircle(view, center, diameter) {
+        const color = "rgba(8, 145, 178, 0.42)";
+        drawCircle(view, center, diameter / 2, color, "transparent", 1.6);
+      }
+
+      function drawSlPoint(view, item) {
+        drawLine(view, item.center, item.statorPoint, "rgba(15, 118, 110, 0.20)", 1.1, [3, 4]);
+        drawLine(view, item.center, item.point, "rgba(124, 58, 237, 0.28)", 1.2, [4, 4]);
+        drawCircle(view, item.center, 0.045, "#7c3aed", "#7c3aed", 1);
+        drawCircle(view, item.point, state.Pin_Size / 2, "#7c3aed", "rgba(124, 58, 237, 0.14)", 2);
+        drawLabel(view, item.point, item.label, "#7c3aed", 8, -8);
+        drawThetaAngle(view, item);
+        drawTangentVector(view, item);
+        drawArcNormalVector(view, item);
+      }
+
+      function drawThetaAngle(view, item) {
+        const radius = 0.5 + item.orderIndex * 0.08;
+        const startAngle = Math.atan2(item.statorPoint.y - item.center.y, item.statorPoint.x - item.center.x);
+        const sweepAngle = rad(item.theta);
+        const midAngle = startAngle + sweepAngle / 2;
+        const labelPoint = {
+          x: item.center.x + (radius + 0.16) * Math.cos(midAngle),
+          y: item.center.y + (radius + 0.16) * Math.sin(midAngle)
+        };
+        drawAngleArc(view, item.center, radius, startAngle, sweepAngle, "#d97706");
+        drawLabel(view, labelPoint, `${fmt(item.theta, 2)}deg`, "#d97706", 4, -4);
+      }
+
+      function drawTangentVector(view, item) {
+        const start = item.point;
+        const end = {
+          x: start.x + item.tangentVector.x * 0.72,
+          y: start.y + item.tangentVector.y * 0.72
+        };
+        drawArrow(view, start, end, "#7c3aed");
+        drawLabel(view, end, item.normalLabel, "#7c3aed", 5, -5);
+      }
+
+      function drawArcNormalVector(view, item) {
+        if (!item.arcNormalVector) return;
+        const color = item.pressureAngleValid ? "#ea580c" : "#dc2626";
+        const start = item.point;
+        const end = {
+          x: start.x + item.arcNormalVector.x * 0.72,
+          y: start.y + item.arcNormalVector.y * 0.72
+        };
+        drawArrow(view, start, end, color);
+        drawLabel(view, end, item.arcNormalLabel, color, 5, 12);
+      }
+
+      function drawArrow(view, start, end, color) {
+        drawLine(view, start, end, color, 1.8);
+        const direction = normalizeVector(subtract(end, start));
+        const left = rotateVector(direction, 150);
+        const right = rotateVector(direction, -150);
+        drawLine(view, end, add(end, scaleVector(left, 0.18)), color, 1.8);
+        drawLine(view, end, add(end, scaleVector(right, 0.18)), color, 1.8);
+      }
+
+      function drawPinSet(view, pins, color, fill, pinRadius, prefix, referenceIndex) {
+        for (const pin of pins) {
+          const isReference = pin.index === referenceIndex;
+          drawCircle(view, pin, pinRadius, isReference ? "#c2410c" : color, isReference ? "rgba(194, 65, 12, 0.14)" : fill, isReference ? 3 : 1.6);
+          drawLabel(view, pin, `${prefix}${pin.index}`, isReference ? "#c2410c" : color);
+        }
+      }
+
+      function apertureBounds(model) {
+        const extent = Math.max(state.Rs, state.Rr) + Math.max(1.2, state.Pin_Size * 2);
+        const points = [
+          { x: -extent, y: -extent },
+          { x: extent, y: extent },
+          ...model.stator,
+          ...model.rotor
+        ];
+        let xMin = Infinity;
+        let xMax = -Infinity;
+        let yMin = Infinity;
+        let yMax = -Infinity;
+        for (const point of points) {
+          xMin = Math.min(xMin, point.x);
+          xMax = Math.max(xMax, point.x);
+          yMin = Math.min(yMin, point.y);
+          yMax = Math.max(yMax, point.y);
+        }
+        const pad = Math.max(0.8, state.Pin_Size * 2);
+        return { xMin: xMin - pad, xMax: xMax + pad, yMin: yMin - pad, yMax: yMax + pad };
+      }
+
+      function drawVariableAperture(model) {
+        const bounds = zoomedBounds(apertureBounds(model), "aperture");
+        const view = setupCanvas(apertureCanvas, bounds);
+        renderState.aperture.scale = view.scale;
+        drawGrid(view, bounds);
+        drawCircle(view, { x: 0, y: 0 }, state.Rs, "#0f766e", "transparent", 1);
+        drawCircle(view, { x: 0, y: 0 }, state.Rr, "#2563eb", "transparent", 1);
+        const pinRadius = state.Pin_Size / 2;
+        drawPinSet(view, model.stator, "#0f766e", "rgba(15, 118, 110, 0.10)", pinRadius, "S", model.reference.index);
+        drawPinSet(view, model.rotor, "#2563eb", "rgba(37, 99, 235, 0.10)", pinRadius, "R", model.reference.index);
+        const extent = Math.max(state.Rs, state.Rr) + Math.max(1.2, state.Pin_Size * 2);
+        drawCircle(view, { x: 0, y: 0 }, 0.04 * extent, "#1f2624", "#1f2624", 1);
+      }
+
+      function dCenteredLeafPinPoints(model, leaf) {
+        const points = [];
+        const visible = visibleLeafPinIndices(model);
+        const states = dCenterStates(leaf);
+        for (const dState of states) {
+          points.push(dState.center);
+          for (const index of visible) {
+            points.push(leafStatorPinAtD(model, dState.center, index));
+            points.push(leafRotorPinAtD(model, dState.center, index, dState.theta));
+          }
+        }
+        return points;
+      }
+
+      function drawDCenteredLeafPins(view, model, leaf, options = {}) {
+        const visible = visibleLeafPinIndices(model);
+        const states = dCenterStates(leaf);
+        if (visible.length === 0 || states.length === 0) return;
+        const pinRadius = state.Pin_Size / 2;
+        if (options.showCenters) {
+          for (const dState of states) {
+            drawCircle(view, dState.center, 0.07, "rgba(31, 38, 36, 0.58)", "rgba(31, 38, 36, 0.58)", 1);
+            drawLabel(view, dState.center, dState.label, "rgba(31, 38, 36, 0.72)", 8, -8);
+          }
+        }
+        for (const index of visible) {
+          const isReference = index === model.reference.index;
+          const rotorPath = states.map((dState) => leafRotorPinAtD(model, dState.center, index, dState.theta));
+          const statorStroke = isReference ? "#0f766e" : "rgba(15, 118, 110, 0.58)";
+          const rotorStroke = isReference ? "#2563eb" : "rgba(37, 99, 235, 0.58)";
+          drawPolyline(view, rotorPath, isReference ? "rgba(37, 99, 235, 0.56)" : "rgba(37, 99, 235, 0.24)", isReference ? 2 : 1.3, [4, 4]);
+          for (const dState of states) {
+            const statorPin = leafStatorPinAtD(model, dState.center, index);
+            const rotorPin = leafRotorPinAtD(model, dState.center, index, dState.theta);
+            const centerLineColor = isReference ? "rgba(31, 38, 36, 0.18)" : "rgba(31, 38, 36, 0.08)";
+            drawLine(view, dState.center, statorPin, centerLineColor, isReference ? 1.1 : 0.8, [3, 5]);
+            drawCircle(view, statorPin, pinRadius, statorStroke, isReference ? "rgba(15, 118, 110, 0.16)" : "rgba(15, 118, 110, 0.07)", isReference ? 2.4 : 1.4);
+            drawCircle(view, rotorPin, pinRadius, rotorStroke, isReference ? "rgba(37, 99, 235, 0.16)" : "rgba(37, 99, 235, 0.07)", isReference ? 2.4 : 1.4);
+          }
+          const firstStator = leafStatorPinAtD(model, states[0].center, index);
+          const lastRotor = rotorPath[rotorPath.length - 1];
+          drawLabel(view, firstStator, `S${index}`, statorStroke, 8, -8);
+          drawLabel(view, lastRotor, `R${index}`, rotorStroke, 8, 16);
+        }
+      }
+
+      function drawLeaf(model, leafGeometry) {
+        const s = model.reference;
+        const r = model.referenceRotor;
+        const leaf = leafGeometry ?? buildLeafGeometry(s);
+        const bounds = zoomedBounds(leafBounds(s, r, leaf, model), "leaf");
+        const view = setupCanvas(leafCanvas, bounds);
+        renderState.leaf.scale = view.scale;
+        drawGrid(view, bounds);
+        drawCircle(view, s, state.Rs, "rgba(31, 38, 36, 0.20)", "transparent", 1.1);
+        if (leaf.dMinCircle) {
+          drawLeafLimitCircle(view, leaf.dMinCircle.center, state.Leaf_max);
+          drawLeafLimitCircle(view, leaf.dMinCircle.center, state.D_F1_47);
+        }
+        if (leaf.dMaxCircle) {
+          drawLeafLimitCircle(view, leaf.dMaxCircle.center, state.Leaf_max);
+        }
+        if (leaf.dMinCircle) {
+          drawComputedDiameterCircle(view, leaf.dMinCircle, "D_min");
+        }
+        drawDfCircle(view, leaf.df6Center, state.D_F6_0, "D_F6.0");
+        drawLine(view, s, leaf.df6Center, "rgba(31, 38, 36, 0.28)", 1.2, [4, 5]);
+        drawCircle(view, leaf.p1, 0.08, "#c2410c", "#c2410c", 1.5);
+        drawLabel(view, leaf.p1, "P1", "#c2410c", 8, -8);
+        if (leaf.l0Start) {
+          drawLine(view, leaf.l0Start, leaf.p1, "#c2410c", 2);
+          drawLabel(view, midpoint(leaf.l0Start, leaf.p1), "L0", "#c2410c", 8, -8);
+        }
+        if (leaf.df17Center) {
+          drawDfCircle(view, leaf.df17Center, state.D_F1_7, "D_F1.7");
+          drawLine(view, s, leaf.df17Center, "rgba(31, 38, 36, 0.28)", 1.2, [4, 5]);
+          drawLine(view, leaf.p1, leaf.p2, "#c2410c", 2);
+          drawCircle(view, leaf.p2, 0.08, "#c2410c", "#c2410c", 1.5);
+          drawLabel(view, leaf.p2, "P2", "#c2410c", 8, -8);
+          drawLabel(view, midpoint(leaf.p1, leaf.p2), "L1", "#c2410c", 8, -8);
+          drawArcBetween(view, leaf.df17Center, state.D_F1_7 / 2, leaf.p2, leaf.p3, "#c2410c", true);
+          drawCircle(view, leaf.p3, 0.08, "#c2410c", "#c2410c", 1.5);
+          drawLabel(view, leaf.p3, "P3", "#c2410c", 8, -8);
+        }
+        if (leaf.df147Center) {
+          drawDfCircle(view, leaf.df147Center, state.D_F1_47, "D_F1.47");
+          drawLine(view, s, leaf.df147Center, "rgba(31, 38, 36, 0.28)", 1.2, [4, 5]);
+          drawLine(view, leaf.p3, leaf.p4, "#c2410c", 2);
+          drawCircle(view, leaf.p4, 0.08, "#c2410c", "#c2410c", 1.5);
+          drawLabel(view, leaf.p4, "P4", "#c2410c", 8, -8);
+          drawLabel(view, midpoint(leaf.p3, leaf.p4), "L2", "#c2410c", 8, -8);
+        }
+        if (leaf.dMaxCircle) {
+          drawComputedDiameterCircle(view, leaf.dMaxCircle, "D_max");
+          drawCircle(view, leaf.p5, 0.08, "#c2410c", "#c2410c", 1.5);
+          drawLabel(view, leaf.p5, "P5", "#c2410c", 8, -8);
+          drawLine(view, leaf.p4, leaf.p5, "#c2410c", 1.8, [4, 4]);
+        }
+        if (leaf.slPoints.length >= 5) {
+          drawArcThroughPoints(view, leaf.slPoints[0].point, leaf.slPoints[1].point, leaf.slPoints[2].point, "#c2410c");
+          drawArcThroughPoints(view, leaf.slPoints[2].point, leaf.slPoints[3].point, leaf.slPoints[4].point, "#c2410c");
+        }
+        for (const item of leaf.slPoints) {
+          drawSlPoint(view, item);
+        }
+        drawDCenteredLeafPins(view, model, leaf, { showCenters: false });
+      }
+
+      function buildLeafGeometry(statorPin, solveSl = true) {
+        const df6Radius = state.D_F6_0 / 2;
+        const df17Radius = state.D_F1_7 / 2;
+        const df147Radius = state.D_F1_47 / 2;
+        const df6Center = { x: 0, y: 0 };
+        const p1 = {
+          x: df6Center.x + df6Radius * Math.cos(rad(state.theta_1)),
+          y: df6Center.y - df6Radius * Math.sin(rad(state.theta_1))
+        };
+        const normal = normalizeVector({ x: p1.x - df6Center.x, y: p1.y - df6Center.y });
+        const l1Direction = { x: -normal.y, y: normal.x };
+        const df17Center = circleLineIntersectionCenter(statorPin, state.Rs, normal, df6Radius - df17Radius, df6Center);
+        let sl0Center = statorCirclePointByX(statorPin, df6Center.x, df6Center);
+        const l1InfiniteLine = lineFromPoints(p1, add(p1, l1Direction));
+        let dMinProjection = projectPointToLine(sl0Center, l1InfiniteLine);
+        let dMinCircle = {
+          center: sl0Center,
+          radius: distance(sl0Center, dMinProjection),
+          tangentPoint: dMinProjection
+        };
+        let slThetas = interpolatedSlThetas();
+        const slPoints = [
+          buildSlPoint("SL0", sl0Center, statorPin, slThetas.sl0),
+          buildSlPoint("SL1", df6Center, statorPin, slThetas.sl1)
+        ];
+        if (!df17Center) {
+          const fallbackL0Start = {
+            x: p1.x - l1Direction.x * state.ex_line,
+            y: p1.y - l1Direction.y * state.ex_line
+          };
+          return {
+            df6Center,
+            df17Center,
+            p1,
+            normal,
+            l1Direction,
+            l0Start: fallbackL0Start,
+            dMinCircle,
+            pointOrder: pointXOrder([p1]),
+            slThetas,
+            slPoints
+          };
+        }
+        const p2 = add(df17Center, scaleVector(normal, df17Radius));
+        const l1Unit = normalizeVector(subtract(p2, p1));
+        const l0Start = add(p1, scaleVector(l1Unit, -state.ex_line));
+        const p3 = rotateAround(p2, df17Center, -state.theta_2);
+        const normal2 = normalizeVector(subtract(p3, df17Center));
+        const l2Direction = { x: -normal2.y, y: normal2.x };
+        const l2Offset = dot(normal2, p3);
+        const df147Center = circleLineIntersectionCenter(statorPin, state.Rs, normal2, l2Offset - df147Radius, df17Center);
+        const p4 = df147Center ? add(df147Center, scaleVector(normal2, df147Radius)) : null;
+        let dMaxCircle = null;
+        let p5 = null;
+        let solved = null;
+        if (df147Center) {
+          let sl4Center = statorCirclePointByX(statorPin, df147Center.x, df147Center);
+          const l2Line = lineFromPoints(p3, p4);
+          if (solveSl) {
+            const slSolve = solveSlCenters({
+              statorPin,
+              sl1Center: df6Center,
+              sl2Center: df17Center,
+              sl3Center: df147Center,
+              sl4Center
+            }, l1InfiniteLine, sl0Center, df147Center, p1, p2, p3, p4);
+            sl0Center = slSolve.sl0Center;
+            sl4Center = slSolve.sl4Center;
+            dMinProjection = projectPointToLine(sl0Center, l1InfiniteLine);
+            dMinCircle = {
+              center: sl0Center,
+              radius: distance(sl0Center, dMinProjection),
+              tangentPoint: dMinProjection
+            };
+            solved = slSolve.solved;
+            slThetas = solved.thetas;
+          }
+          p5 = projectPointToLine(sl4Center, l2Line);
+          dMaxCircle = {
+            center: sl4Center,
+            radius: distance(sl4Center, p5),
+            tangentPoint: p5
+          };
+          slPoints.length = 0;
+          slPoints.push(
+            buildSlPoint("SL0", sl0Center, statorPin, slThetas.sl0),
+            buildSlPoint("SL1", df6Center, statorPin, slThetas.sl1),
+            buildSlPoint("SL2", df17Center, statorPin, slThetas.sl2),
+            buildSlPoint("SL3", df147Center, statorPin, slThetas.sl3),
+            buildSlPoint("SL4", sl4Center, statorPin, slThetas.sl4)
+          );
+        } else {
+          slPoints.push(buildSlPoint("SL2", df17Center, statorPin, slThetas.sl2));
+        }
+        const slArcData = annotateSlArcVectors(slPoints);
+        const pointOrder = pointXOrder([p1, p2, p3, p4, p5]);
+        const pressureRange = slArcData?.pressureRange ?? null;
+        const pressureTargets = slArcData?.pressureTargets ?? null;
+        const diameterOrder = dMaxCircle
+          ? diameterOrderStatus(dMaxCircle.radius * 2, dMinCircle.radius * 2)
+          : null;
+        const dMinLeftArcTangent = dMinLeftArcTangentStatus(
+          dMinCircle.center,
+          dMinCircle.tangentPoint,
+          normal,
+          dot(normal, p1),
+          l1Unit,
+          p1,
+          df6Center,
+          df6Radius,
+          dMinCircle.radius
+        );
+        return {
+          df6Center,
+          df17Center,
+          df147Center,
+          p1,
+          p2,
+          p3,
+          p4,
+          p5,
+          l0Start,
+          dMinCircle,
+          dMaxCircle,
+          normal,
+          normal2,
+          l1Direction,
+          l2Direction,
+          theta_sr_ref1: slThetas.sl2,
+          theta_sr_ref2: slThetas.sl3,
+          slThetas,
+          thetaSolveResidual: solved?.residual ?? null,
+          slArcData,
+          pressureRange,
+          pressureTargets,
+          diameterOrder,
+          dMinLeftArcTangent,
+          pointOrder,
+          slPoints
+        };
+      }
+
+      function pointXOrder(points) {
+        const validPoints = points.filter(Boolean);
+        if (validPoints.length < 5) {
+          return { valid: false, minGap: null, label: "P1 > P2 > P3 > P4 > P5 unavailable" };
+        }
+        const gaps = [];
+        for (let index = 1; index < validPoints.length; index += 1) {
+          gaps.push(validPoints[index - 1].x - validPoints[index].x);
+        }
+        const minGap = Math.min(...gaps);
+        return {
+          valid: gaps.every((gap) => gap > 0),
+          minGap,
+          label: validPoints.map((point, index) => `P${index + 1}.x=${fmt(point.x, 4)}`).join(" > ")
+        };
+      }
+
+      function diameterOrderStatus(dMaxDiameter, dMinDiameter) {
+        const items = [
+          { label: "D_max", value: dMaxDiameter },
+          { label: "D_F1.47", value: state.D_F1_47 },
+          { label: "D_F1.7", value: state.D_F1_7 },
+          { label: "D_F4.0", value: state.D_F4_0 },
+          { label: "D_F6.0", value: state.D_F6_0 },
+          { label: "D_min", value: dMinDiameter }
+        ];
+        const gaps = [];
+        for (let index = 1; index < items.length; index += 1) {
+          gaps.push(items[index - 1].value - items[index].value);
+        }
+        const minGap = Math.min(...gaps);
+        return {
+          valid: items.every((item) => Number.isFinite(item.value)) && gaps.every((gap) => gap > 0),
+          minGap,
+          label: items.map((item) => `${item.label}=${fmt(item.value, 4)}`).join(" > ")
+        };
+      }
+
+      function dMinLeftArcTangentStatus(center, tangentPoint, lineNormal, lineOffset, lineDirection, p1, df6Center, df6Radius, dMinRadius) {
+        const leftTolerance = 0.01;
+        const signedDistance = lineOffset - dot(lineNormal, center);
+        const tangentOffset = tangentPoint ? dot(subtract(tangentPoint, p1), lineDirection) : Infinity;
+        const centerDistance = distance(center, df6Center);
+        const arcResidual = Math.abs(centerDistance - Math.abs(df6Radius - dMinRadius));
+        const sideViolation = Math.max(0, 1e-6 - signedDistance);
+        const leftViolation = Math.max(0, tangentOffset - leftTolerance);
+        return {
+          valid: signedDistance > 0 && tangentOffset <= leftTolerance && arcResidual <= 0.03,
+          signedDistance,
+          tangentOffset,
+          arcResidual,
+          penalty: sideViolation * 1000 + leftViolation * 100 + arcResidual * 10000,
+          label: `line side=${fmt(signedDistance, 4)}, tangent offset=${fmt(tangentOffset, 4)}mm, D_min-D_F6 arc residual=${fmt(arcResidual, 5)}mm`
+        };
+      }
+
+      function buildSlPoint(label, center, statorPin, theta) {
+        const baseAngle = angleFromCenterToPoint(center, statorPin);
+        const point = pinFromCenter(center, state.Rr, baseAngle + theta);
+        const radial = normalizeVector(subtract(point, center));
+        const tangentVector = normalizeVector({ x: -radial.y, y: radial.x });
+        const orderIndex = Number(label.replace("SL", ""));
+        return {
+          label,
+          center,
+          statorPoint: statorPin,
+          theta,
+          point,
+          radial,
+          tangentVector,
+          orderIndex,
+          normalLabel: `n${label.replace("SL", "")}`
+        };
+      }
+
+      function annotateSlArcVectors(slPoints) {
+        if (slPoints.length < 5) return null;
+        const arc1 = circleFrom3Points(slPoints[0].point, slPoints[1].point, slPoints[2].point);
+        const arc2 = circleFrom3Points(slPoints[2].point, slPoints[3].point, slPoints[4].point);
+        if (!arc1 || !arc2) return null;
+        setArcNormalVector(slPoints[0], arc1.center, 0);
+        setArcNormalVector(slPoints[1], arc1.center, 1);
+        const arc1NormalAtSl2 = normalizeVector(subtract(slPoints[2].point, arc1.center));
+        let arc2NormalAtSl2 = normalizeVector(subtract(slPoints[2].point, arc2.center));
+        if (dot(arc1NormalAtSl2, arc2NormalAtSl2) < 0) {
+          arc2NormalAtSl2 = scaleVector(arc2NormalAtSl2, -1);
+        }
+        setPressureVector(slPoints[2], normalizeVector(add(arc1NormalAtSl2, arc2NormalAtSl2)));
+        slPoints[2].arcNormalLabel = "v2";
+        setArcNormalVector(slPoints[3], arc2.center, 3);
+        setArcNormalVector(slPoints[4], arc2.center, 4);
+        const pressureRange = pressureRangeStatus(slPoints);
+        const arcCenterSide = arcCenterSideStatus(arc1, arc2, slPoints[2].point);
+        const pressureTargets = pressureTargetStatus(slPoints);
+        return { arc1, arc2, pressureRange, arcCenterSide, pressureTargets };
+      }
+
+      function arcCenterSideStatus(arc1, arc2, sl2Point) {
+        const arc1DeltaX = arc1.center.x - sl2Point.x;
+        const arc2DeltaX = arc2.center.x - sl2Point.x;
+        return {
+          valid: arc1DeltaX < 0 && arc2DeltaX < 0,
+          arc1DeltaX,
+          arc2DeltaX,
+          maxViolation: Math.max(0, arc1DeltaX, arc2DeltaX)
+        };
+      }
+
+      function setArcNormalVector(item, arcCenter, index) {
+        setPressureVector(item, normalizeVector(subtract(item.point, arcCenter)));
+        item.arcNormalLabel = `v${index}`;
+      }
+
+      function setPressureVector(item, vector) {
+        const candidate = orientPositivePressureVector(vector, item.tangentVector);
+        item.arcNormalVector = candidate.vector;
+        item.epsilon = candidate.angle;
+        item.pressureAngleValid = candidate.valid;
+      }
+
+      function orientPositivePressureVector(vector, tangentVector) {
+        const first = normalizeVector(vector);
+        const second = scaleVector(first, -1);
+        const firstAngle = positivePressureAngle(first, tangentVector);
+        const secondAngle = positivePressureAngle(second, tangentVector);
+        const firstValid = isPositivePressureAngle(firstAngle);
+        const secondValid = isPositivePressureAngle(secondAngle);
+        if (firstValid) return { vector: first, angle: firstAngle, valid: true };
+        if (secondValid) return { vector: second, angle: secondAngle, valid: true };
+        const firstPenalty = pressureAnglePenalty(firstAngle);
+        const secondPenalty = pressureAnglePenalty(secondAngle);
+        return firstPenalty <= secondPenalty
+          ? { vector: first, angle: firstAngle, valid: false }
+          : { vector: second, angle: secondAngle, valid: false };
+      }
+
+      function positivePressureAngle(vector, tangentVector) {
+        const angle = Math.atan2(cross(vector, tangentVector), dot(vector, tangentVector)) / DEG;
+        return angle < 0 ? angle + 360 : angle;
+      }
+
+      function isPositivePressureAngle(angle) {
+        return angle > 0 && angle < 90;
+      }
+
+      function pressureAnglePenalty(angle) {
+        if (isPositivePressureAngle(angle)) return 0;
+        return Math.min(Math.abs(angle), Math.abs(angle - 90), Math.abs(angle - 360));
+      }
+
+      function pressureRangeStatus(slPoints) {
+        const items = slPoints.filter((item) => item.arcNormalVector);
+        const invalid = items.filter((item) => !item.pressureAngleValid);
+        return {
+          valid: invalid.length === 0,
+          minAngle: Math.min(...items.map((item) => item.epsilon)),
+          maxAngle: Math.max(...items.map((item) => item.epsilon)),
+          invalidLabels: invalid.map((item) => item.label)
+        };
+      }
+
+      function pressureRangePenalty(slPoints) {
+        return slPoints
+          .filter((item) => item.arcNormalVector)
+          .reduce((sum, item) => sum + pressureAnglePenalty(item.epsilon) ** 2, 0);
+      }
+
+      function pressureTargetStatus(slPoints) {
+        const targetLabels = new Set(["SL0", "SL2", "SL4"]);
+        const targets = slPoints
+          .filter((item) => targetLabels.has(item.label) && Number.isFinite(item.epsilon))
+          .map((item) => ({
+            label: item.label,
+            angle: item.epsilon,
+            error: item.epsilon - state.Pressure_angle
+          }));
+        const sumSquaredError = targets.reduce((sum, item) => sum + item.error * item.error, 0);
+        const maxAbsError = targets.reduce((max, item) => Math.max(max, Math.abs(item.error)), 0);
+        return {
+          targets,
+          sumSquaredError,
+          maxAbsError,
+          valid: targets.length === targetLabels.size && maxAbsError <= 0.5
+        };
+      }
+
+      function interpolatedSlThetas() {
+        const sl0 = state.SL0_theta;
+        const sl1 = sl0 + 0.7;
+        const sl4 = state.SL4_theta;
+        const sl3 = sl4 - 0.7;
+        return {
+          sl0,
+          sl1,
+          sl2: (sl1 + sl3) / 2,
+          sl3,
+          sl4
+        };
+      }
+
+      function solveSlCenters(baseCenters, l1InfiniteLine, preferredSl0Center, preferredSl4Center, p1, p2, p3, p4) {
+        const seeds = interpolatedSlThetas();
+        const lower = seeds.sl1 + 0.05;
+        const upper = seeds.sl3 - 0.05;
+        let best = null;
+        const accept = (sl0Angle, sl4Angle, thetaSrRef1) => {
+          if (thetaSrRef1 <= lower || thetaSrRef1 >= upper) return;
+          const candidate = scoreSlCenters(
+            baseCenters,
+            l1InfiniteLine,
+            preferredSl0Center,
+            preferredSl4Center,
+            p1,
+            p2,
+            p3,
+            p4,
+            sl0Angle,
+            sl4Angle,
+            thetaSrRef1,
+            seeds
+          );
+          if (!best || candidate.objective < best.objective) best = candidate;
+        };
+
+        const preferredSl0Angle = angleOfVector(subtract(preferredSl0Center, baseCenters.statorPin));
+        const preferredSl4Angle = angleOfVector(subtract(preferredSl4Center, baseCenters.statorPin));
+        accept(preferredSl0Angle, preferredSl4Angle, seeds.sl2);
+
+        for (let d0 = -8; d0 <= 8; d0 += 1) {
+          for (let d4 = -8; d4 <= 8; d4 += 1) {
+            for (let thetaSrRef1 = lower; thetaSrRef1 <= upper; thetaSrRef1 += 0.5) {
+              accept(preferredSl0Angle + d0, preferredSl4Angle + d4, thetaSrRef1);
+            }
+          }
+        }
+
+        if (constraintEnabled("pressureTarget")) {
+          for (let d0 = -3; d0 <= 3; d0 += 0.5) {
+            for (let d4 = -3; d4 <= 3; d4 += 0.5) {
+              for (let thetaSrRef1 = lower; thetaSrRef1 <= upper; thetaSrRef1 += 0.5) {
+                accept(preferredSl0Angle + d0, preferredSl4Angle + d4, thetaSrRef1);
+              }
+            }
+          }
+        }
+
+        if (!best || best.objective >= HARD_CONSTRAINT_PENALTY) {
+          for (let sl0Angle = 0; sl0Angle < 360; sl0Angle += 18) {
+            for (let sl4Angle = 0; sl4Angle < 360; sl4Angle += 18) {
+              for (let thetaSrRef1 = lower; thetaSrRef1 <= upper; thetaSrRef1 += 1) {
+                accept(sl0Angle, sl4Angle, thetaSrRef1);
+              }
+            }
+          }
+        }
+
+        let sl0Angle = best.sl0Angle;
+        let sl4Angle = best.sl4Angle;
+        let thetaSrRef1 = best.thetas.sl2;
+        let angleStep = 6;
+        let thetaStep = 0.6;
+        while (angleStep > 0.02 || thetaStep > 0.002) {
+          let improved = false;
+          for (const d0 of [-angleStep, 0, angleStep]) {
+            for (const d4 of [-angleStep, 0, angleStep]) {
+              for (const dt of [-thetaStep, 0, thetaStep]) {
+                if (d0 === 0 && d4 === 0 && dt === 0) continue;
+                const previous = best;
+                accept(sl0Angle + d0, sl4Angle + d4, thetaSrRef1 + dt);
+                if (best !== previous) {
+                  sl0Angle = best.sl0Angle;
+                  sl4Angle = best.sl4Angle;
+                  thetaSrRef1 = best.thetas.sl2;
+                  improved = true;
+                }
+              }
+            }
+          }
+          if (!improved) {
+            angleStep /= 2;
+            thetaStep /= 2;
+          }
+        }
+        return { sl0Center: best.sl0Center, sl4Center: best.sl4Center, solved: best.solved };
+      }
+
+      function scoreSlCenters(baseCenters, l1InfiniteLine, preferredSl0Center, preferredSl4Center, p1, p2, p3, p4, sl0Angle, sl4Angle, thetaSrRef1, seeds) {
+        const centers = {
+          ...baseCenters,
+          sl0Center: pointOnCircle(baseCenters.statorPin, state.Rs, sl0Angle),
+          sl4Center: pointOnCircle(baseCenters.statorPin, state.Rs, sl4Angle)
+        };
+        const thetas = {
+          sl0: seeds.sl0,
+          sl1: seeds.sl1,
+          sl2: thetaSrRef1,
+          sl3: seeds.sl3,
+          sl4: seeds.sl4
+        };
+        const dMinDiameter = distance(
+          centers.sl0Center,
+          projectPointToLine(centers.sl0Center, l1InfiniteLine)
+        ) * 2;
+        const dMinProjection = projectPointToLine(centers.sl0Center, l1InfiniteLine);
+        const dMinRadius = dMinDiameter / 2;
+        const l1Normal = normalizeVector(subtract(p1, baseCenters.sl1Center));
+        const dMinLeftArcTangent = dMinLeftArcTangentStatus(
+          centers.sl0Center,
+          dMinProjection,
+          l1Normal,
+          dot(l1Normal, p1),
+          l1InfiniteLine.direction,
+          p1,
+          baseCenters.sl1Center,
+          state.D_F6_0 / 2,
+          dMinRadius
+        );
+        const slPoints = buildCandidateSlPoints(centers, thetas);
+        const slArcData = annotateSlArcVectors(slPoints);
+        const side = slArcData?.arcCenterSide;
+        const pressureRange = slArcData?.pressureRange;
+        const pressureTargets = slArcData?.pressureTargets;
+        const p5 = projectPointToLine(centers.sl4Center, lineFromPoints(p3, p4));
+        const dMaxDiameter = distance(centers.sl4Center, p5) * 2;
+        const diameterOrder = diameterOrderStatus(dMaxDiameter, dMinDiameter);
+        const pointOrder = pointXOrder([p1, p2, p3, p4, p5]);
+        const residual = arcTangencyResidual(slArcData, slPoints);
+        const sidePenalty = activePenalty("arcCenterLeft", side?.valid ? 0 : HARD_CONSTRAINT_PENALTY + (side?.maxViolation ?? 1) * 1000);
+        const dMinPenalty = activePenalty("dMinGtOne", dMinDiameter > 1 ? 0 : HARD_CONSTRAINT_PENALTY + (1 - dMinDiameter) * 1000);
+        const diameterOrderPenalty = activePenalty("diameterOrder", diameterOrder.valid ? 0 : HARD_CONSTRAINT_PENALTY + Math.abs(diameterOrder.minGap ?? 1) * 1000000);
+        const dMinLeftArcPenalty = activePenalty("dMinLeftArcTangent", dMinLeftArcTangent.valid ? 0 : HARD_CONSTRAINT_PENALTY + dMinLeftArcTangent.penalty);
+        const pointOrderPenalty = activePenalty("pointXOrder", pointOrder.valid ? 0 : HARD_CONSTRAINT_PENALTY + Math.abs(pointOrder.minGap ?? 1) * 1000);
+        const pressureRangePenaltyValue = activePenalty("pressureRange", pressureRange?.valid ? 0 : HARD_CONSTRAINT_PENALTY + pressureRangePenalty(slPoints) * 1000);
+        const pressureTargetPenalty = activePenalty("pressureTarget", pressureTargets ? pressureTargets.sumSquaredError * 1000 : 100000);
+        const residualPenalty = activePenalty("arcTangency", residual <= ARC_TANGENCY_TOLERANCE
+          ? residual * residual * 10000
+          : HARD_CONSTRAINT_PENALTY + (residual - ARC_TANGENCY_TOLERANCE) * 1000000);
+        const preferencePenalty =
+          distance(centers.sl0Center, preferredSl0Center) ** 2 * 20 +
+          distance(centers.sl4Center, preferredSl4Center) ** 2 * 20;
+        const solved = {
+          theta_sr_ref1: thetas.sl2,
+          theta_sr_ref2: thetas.sl3,
+          thetas,
+          residual,
+          objective: residualPenalty + pressureTargetPenalty
+        };
+        return {
+          sl0Center: centers.sl0Center,
+          sl4Center: centers.sl4Center,
+          sl0Angle,
+          sl4Angle,
+          thetas,
+          solved,
+          sideValid: side?.valid === true,
+          dMinValid: dMinDiameter > 1,
+          diameterOrderValid: diameterOrder.valid,
+          dMinLeftArcTangentValid: dMinLeftArcTangent.valid,
+          objective: sidePenalty + dMinPenalty + diameterOrderPenalty + dMinLeftArcPenalty + pointOrderPenalty + pressureRangePenaltyValue + residualPenalty + pressureTargetPenalty + preferencePenalty
+        };
+      }
+
+      function pointOnCircle(center, radius, angleDeg) {
+        return {
+          x: center.x + radius * Math.cos(rad(angleDeg)),
+          y: center.y + radius * Math.sin(rad(angleDeg))
+        };
+      }
+
+      function angleOfVector(vector) {
+        return Math.atan2(vector.y, vector.x) / DEG;
+      }
+
+      function solveThetaRefs(centers) {
+        const seeds = interpolatedSlThetas();
+        let best = {
+          theta_sr_ref1: seeds.sl2,
+          theta_sr_ref2: seeds.sl3,
+          thetas: seeds,
+          residual: Infinity,
+          objective: Infinity
+        };
+        const lower = seeds.sl1 + 0.05;
+        const upper = seeds.sl3 - 0.05;
+        if (!(seeds.sl0 < seeds.sl1 && lower < upper && seeds.sl3 < seeds.sl4)) return best;
+        for (let theta = lower; theta <= upper; theta += 0.2) {
+          const candidate = scoreThetaRefs(centers, theta, seeds);
+          if (candidate.objective < best.objective) best = candidate;
+        }
+        let step = 0.1;
+        while (step > 0.00001) {
+          let improved = false;
+          for (const delta of [-step, step]) {
+            const theta = best.theta_sr_ref1 + delta;
+            if (theta <= lower || theta >= upper) continue;
+            const candidate = scoreThetaRefs(centers, theta, seeds);
+            if (candidate.objective < best.objective) {
+              best = candidate;
+              improved = true;
+            }
+          }
+          if (!improved) step /= 2;
+        }
+        return best;
+      }
+
+      function scoreThetaRefs(centers, theta_sr_ref1, seeds) {
+        const residual = tangentResidual(centers, theta_sr_ref1, seeds);
+        const regularization = 0.0005 * (theta_sr_ref1 - seeds.sl2) * (theta_sr_ref1 - seeds.sl2);
+        const thetas = {
+          sl0: seeds.sl0,
+          sl1: seeds.sl1,
+          sl2: theta_sr_ref1,
+          sl3: seeds.sl3,
+          sl4: seeds.sl4
+        };
+        const slPoints = buildCandidateSlPoints(centers, thetas);
+        const slArcData = annotateSlArcVectors(slPoints);
+        const pressureRangePenaltyValue = activePenalty("pressureRange", slArcData?.pressureRange?.valid ? 0 : 100000 + pressureRangePenalty(slPoints) * 1000);
+        const pressureTargetPenalty = activePenalty("pressureTarget", slArcData?.pressureTargets
+          ? slArcData.pressureTargets.sumSquaredError * 500
+          : 100000);
+        const residualPenalty = activePenalty("arcTangency", residual <= ARC_TANGENCY_TOLERANCE
+          ? residual * residual * 10000
+          : HARD_CONSTRAINT_PENALTY + (residual - ARC_TANGENCY_TOLERANCE) * 1000000);
+        return {
+          theta_sr_ref1,
+          theta_sr_ref2: seeds.sl3,
+          thetas,
+          residual,
+          objective: residualPenalty + pressureRangePenaltyValue + pressureTargetPenalty + regularization
+        };
+      }
+
+      function buildCandidateSlPoints(centers, thetas) {
+        return [
+          buildSlPoint("SL0", centers.sl0Center, centers.statorPin, thetas.sl0),
+          buildSlPoint("SL1", centers.sl1Center, centers.statorPin, thetas.sl1),
+          buildSlPoint("SL2", centers.sl2Center, centers.statorPin, thetas.sl2),
+          buildSlPoint("SL3", centers.sl3Center, centers.statorPin, thetas.sl3),
+          buildSlPoint("SL4", centers.sl4Center, centers.statorPin, thetas.sl4)
+        ];
+      }
+
+      function arcTangencyResidual(slArcData, slPoints) {
+        if (!slArcData?.arc1 || !slArcData?.arc2 || slPoints.length < 5) return 9;
+        if (constraintEnabled("arcCenterLeft") && !slArcData.arcCenterSide.valid) return 9 + slArcData.arcCenterSide.maxViolation;
+        const sl2 = slPoints[2].point;
+        const v1 = subtract(slArcData.arc1.center, sl2);
+        const v2 = subtract(slArcData.arc2.center, sl2);
+        const denom = Math.hypot(v1.x, v1.y) * Math.hypot(v2.x, v2.y);
+        if (denom < 1e-9) return 9;
+        const sameDirection = dot(v1, v2) / denom;
+        if (sameDirection <= 0) return 9 + Math.abs(sameDirection);
+        return Math.abs(cross(v1, v2)) / denom;
+      }
+
+      function tangentResidual(centers, theta_sr_ref1, seeds) {
+        if (!(seeds.sl1 > seeds.sl0 && theta_sr_ref1 > seeds.sl1 && seeds.sl3 > theta_sr_ref1 && seeds.sl4 > seeds.sl3)) return 9;
+        const slPoints = buildCandidateSlPoints(centers, {
+          sl0: seeds.sl0,
+          sl1: seeds.sl1,
+          sl2: theta_sr_ref1,
+          sl3: seeds.sl3,
+          sl4: seeds.sl4
+        });
+        const sl0 = slPoints[0].point;
+        const sl1 = slPoints[1].point;
+        const sl2 = slPoints[2].point;
+        const sl3 = slPoints[3].point;
+        const sl4 = slPoints[4].point;
+        const arc1 = circleFrom3Points(sl0, sl1, sl2);
+        const arc2 = circleFrom3Points(sl2, sl3, sl4);
+        if (!arc1 || !arc2) return 9;
+        const side = arcCenterSideStatus(arc1, arc2, sl2);
+        if (constraintEnabled("arcCenterLeft") && !side.valid) return 9 + side.maxViolation;
+        const v1 = subtract(arc1.center, sl2);
+        const v2 = subtract(arc2.center, sl2);
+        const denom = Math.hypot(v1.x, v1.y) * Math.hypot(v2.x, v2.y);
+        if (denom < 1e-9) return 9;
+        const sameDirection = dot(v1, v2) / denom;
+        if (sameDirection <= 0) return 9 + Math.abs(sameDirection);
+        return Math.abs(cross(v1, v2)) / denom;
+      }
+
+      function circleFrom3Points(a, b, c) {
+        const ax = b.x - a.x;
+        const ay = b.y - a.y;
+        const bx = c.x - a.x;
+        const by = c.y - a.y;
+        const det = 2 * (ax * by - ay * bx);
+        if (Math.abs(det) < 1e-9) return null;
+        const e = ax * (a.x + b.x) + ay * (a.y + b.y);
+        const f = bx * (a.x + c.x) + by * (a.y + c.y);
+        const center = {
+          x: (by * e - ay * f) / det,
+          y: (-bx * e + ax * f) / det
+        };
+        return { center, radius: distance(center, a) };
+      }
+
+      function statorCirclePointByX(statorPin, desiredX, fallbackPoint) {
+        const dx = desiredX - statorPin.x;
+        const remaining = state.Rs * state.Rs - dx * dx;
+        if (remaining < -1e-9) return fallbackPoint;
+        const yOffset = Math.sqrt(Math.max(0, remaining));
+        const candidates = [
+          { x: desiredX, y: statorPin.y + yOffset },
+          { x: desiredX, y: statorPin.y - yOffset }
+        ];
+        return candidates.reduce((best, candidate) => (
+          Math.abs(candidate.y - fallbackPoint.y) < Math.abs(best.y - fallbackPoint.y) ? candidate : best
+        ), candidates[0]);
+      }
+
+      function angleFromCenterToPoint(center, point) {
+        const dx = point.x - center.x;
+        const dy = point.y - center.y;
+        return ((Math.atan2(-dx, dy) / DEG) % 360 + 360) % 360;
+      }
+
+      function pinFromCenter(center, radius, angleFromY) {
+        return {
+          x: center.x - radius * Math.sin(rad(angleFromY)),
+          y: center.y + radius * Math.cos(rad(angleFromY)),
+          angleFromY
+        };
+      }
+
+      function add(a, b) {
+        return { x: a.x + b.x, y: a.y + b.y };
+      }
+
+      function subtract(a, b) {
+        return { x: a.x - b.x, y: a.y - b.y };
+      }
+
+      function scaleVector(vector, scalar) {
+        return { x: vector.x * scalar, y: vector.y * scalar };
+      }
+
+      function rotateVector(vector, angleDeg) {
+        const angle = rad(angleDeg);
+        return {
+          x: vector.x * Math.cos(angle) - vector.y * Math.sin(angle),
+          y: vector.x * Math.sin(angle) + vector.y * Math.cos(angle)
+        };
+      }
+
+      function midpoint(a, b) {
+        return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      }
+
+      function rotateAround(point, center, angleDeg) {
+        const angle = rad(angleDeg);
+        const x = point.x - center.x;
+        const y = point.y - center.y;
+        return {
+          x: center.x + x * Math.cos(angle) - y * Math.sin(angle),
+          y: center.y + x * Math.sin(angle) + y * Math.cos(angle)
+        };
+      }
+
+      function normalizeVector(vector) {
+        const length = Math.hypot(vector.x, vector.y);
+        if (length < 1e-9) return { x: 1, y: 0 };
+        return { x: vector.x / length, y: vector.y / length };
+      }
+
+      function dot(a, b) {
+        return a.x * b.x + a.y * b.y;
+      }
+
+      function cross(a, b) {
+        return a.x * b.y - a.y * b.x;
+      }
+
+      function lineFromPoints(a, b) {
+        return { point: a, direction: normalizeVector(subtract(b, a)) };
+      }
+
+      function projectPointToLine(point, line) {
+        const delta = subtract(point, line.point);
+        return add(line.point, scaleVector(line.direction, dot(delta, line.direction)));
+      }
+
+      function circleLineIntersectionCenter(circleCenter, circleRadius, lineNormal, lineOffset, preferredPoint) {
+        const signedDistance = lineOffset - dot(lineNormal, circleCenter);
+        const remaining = circleRadius * circleRadius - signedDistance * signedDistance;
+        if (remaining < -1e-9) return null;
+        const foot = {
+          x: circleCenter.x + lineNormal.x * signedDistance,
+          y: circleCenter.y + lineNormal.y * signedDistance
+        };
+        const half = Math.sqrt(Math.max(0, remaining));
+        const tangent = { x: -lineNormal.y, y: lineNormal.x };
+        const candidates = [
+          { x: foot.x + tangent.x * half, y: foot.y + tangent.y * half },
+          { x: foot.x - tangent.x * half, y: foot.y - tangent.y * half }
+        ];
+        return candidates.reduce((best, candidate) => (
+          distance(candidate, preferredPoint) < distance(best, preferredPoint) ? candidate : best
+        ), candidates[0]);
+      }
+
+      function leafBounds(statorPin, rotorPin, leaf, model = null) {
+        const circles = [
+          { center: leaf.df6Center, radius: state.D_F6_0 / 2 },
+          { center: statorPin, radius: state.Rs }
+        ];
+        if (leaf.dMinCircle) circles.push({ center: leaf.dMinCircle.center, radius: leaf.dMinCircle.radius });
+        if (leaf.dMinCircle) circles.push(
+          { center: leaf.dMinCircle.center, radius: state.Leaf_max / 2 },
+          { center: leaf.dMinCircle.center, radius: state.D_F1_47 / 2 }
+        );
+        if (leaf.df17Center) circles.push({ center: leaf.df17Center, radius: state.D_F1_7 / 2 });
+        if (leaf.df147Center) circles.push({ center: leaf.df147Center, radius: state.D_F1_47 / 2 });
+        if (leaf.dMaxCircle) circles.push({ center: leaf.dMaxCircle.center, radius: leaf.dMaxCircle.radius });
+        if (leaf.dMaxCircle) circles.push({ center: leaf.dMaxCircle.center, radius: state.Leaf_max / 2 });
+        const points = [statorPin, rotorPin, leaf.df6Center, leaf.p1];
+        if (leaf.l0Start) points.push(leaf.l0Start);
+        if (leaf.df17Center) points.push(leaf.df17Center, leaf.p2, leaf.p3);
+        if (leaf.df147Center) points.push(leaf.df147Center, leaf.p4);
+        if (leaf.p5) points.push(leaf.p5);
+        for (const item of leaf.slPoints) {
+          points.push(item.center, item.point);
+          if (item.tangentVector) points.push(add(item.point, scaleVector(item.tangentVector, 0.72)));
+          if (item.arcNormalVector) points.push(add(item.point, scaleVector(item.arcNormalVector, 0.72)));
+        }
+        if (model) {
+          points.push(...dCenteredLeafPinPoints(model, leaf));
+        }
+        let xMin = Infinity;
+        let xMax = -Infinity;
+        let yMin = Infinity;
+        let yMax = -Infinity;
+        for (const point of points) {
+          xMin = Math.min(xMin, point.x);
+          xMax = Math.max(xMax, point.x);
+          yMin = Math.min(yMin, point.y);
+          yMax = Math.max(yMax, point.y);
+        }
+        for (const circle of circles) {
+          xMin = Math.min(xMin, circle.center.x - circle.radius);
+          xMax = Math.max(xMax, circle.center.x + circle.radius);
+          yMin = Math.min(yMin, circle.center.y - circle.radius);
+          yMax = Math.max(yMax, circle.center.y + circle.radius);
+        }
+        const pad = Math.max(0.8, state.Pin_Size * 2);
+        return { xMin: xMin - pad, xMax: xMax + pad, yMin: yMin - pad, yMax: yMax + pad };
+      }
+
+      function distance(a, b) {
+        return Math.hypot(a.x - b.x, a.y - b.y);
+      }
+
+      function thetaOrderStatus(leaf) {
+        const theta = leaf.slThetas;
+        const valid = theta
+          && theta.sl0 < theta.sl1
+          && theta.sl1 < theta.sl2
+          && theta.sl2 < theta.sl3
+          && theta.sl3 < theta.sl4;
+        return {
+          valid,
+          note: theta
+            ? `SL0=${fmt(theta.sl0, 3)} < SL1=${fmt(theta.sl1, 3)} < SL2=${fmt(theta.sl2, 3)} < SL3=${fmt(theta.sl3, 3)} < SL4=${fmt(theta.sl4, 3)}`
+            : "SL theta unavailable"
+        };
+      }
+
+      function constraintStatuses(leaf) {
+        const dMinDiameter = leaf.dMinCircle ? leaf.dMinCircle.radius * 2 : null;
+        const residual = leaf.thetaSolveResidual;
+        return {
+          arcTangency: {
+            valid: Number.isFinite(residual) && residual <= ARC_TANGENCY_TOLERANCE,
+            note: `residual ${fmt(residual, 6)} <= ${fmt(ARC_TANGENCY_TOLERANCE, 3)}`
+          },
+          arcCenterLeft: {
+            valid: leaf.slArcData?.arcCenterSide?.valid === true,
+            note: leaf.slArcData?.arcCenterSide
+              ? `Arc1 dx=${fmt(leaf.slArcData.arcCenterSide.arc1DeltaX, 4)}, Arc2 dx=${fmt(leaf.slArcData.arcCenterSide.arc2DeltaX, 4)}`
+              : "Arc center unavailable"
+          },
+          thetaOrder: thetaOrderStatus(leaf),
+          pointXOrder: {
+            valid: leaf.pointOrder?.valid === true,
+            note: leaf.pointOrder?.label ?? "P order unavailable"
+          },
+          dMinGtOne: {
+            valid: dMinDiameter > 1,
+            note: `D_min=${fmt(dMinDiameter, 4)}mm`
+          },
+          diameterOrder: {
+            valid: leaf.diameterOrder?.valid === true,
+            note: leaf.diameterOrder?.label ?? "Diameter order unavailable"
+          },
+          dMinLeftArcTangent: {
+            valid: leaf.dMinLeftArcTangent?.valid === true,
+            note: leaf.dMinLeftArcTangent?.label ?? "D_min line/arc tangency unavailable"
+          },
+          pressureRange: {
+            valid: leaf.pressureRange?.valid === true,
+            note: leaf.pressureRange
+              ? `min=${fmt(leaf.pressureRange.minAngle, 3)}deg, max=${fmt(leaf.pressureRange.maxAngle, 3)}deg`
+              : "Pressure range unavailable"
+          },
+          pressureTarget: {
+            valid: leaf.pressureTargets?.valid === true,
+            note: leaf.pressureTargets
+              ? leaf.pressureTargets.targets.map((item) => `${item.label} ${fmt(item.angle, 3)}deg`).join(", ")
+              : "Pressure target unavailable"
+          }
+        };
+      }
+
+      function updateConstraintStatuses(leaf) {
+        const statuses = constraintStatuses(leaf);
+        for (const def of constraintDefs) {
+          const status = statuses[def.key];
+          const element = document.querySelector(`[data-constraint-status="${def.key}"]`);
+          const note = document.querySelector(`[data-constraint-note="${def.key}"]`);
+          if (!element || !status) continue;
+          const enabled = constraintEnabled(def.key);
+          element.textContent = enabled ? (status.valid ? "OK" : "NG") : "OFF";
+          element.className = `constraint-status ${enabled ? (status.valid ? "" : "ng") : "off"}`;
+          if (note) note.textContent = `${def.note} ${status.note}`;
+        }
+      }
+
+      function updateText(model, leafGeometry) {
+        const s = model.reference;
+        const r = model.referenceRotor;
+        const leaf = leafGeometry ?? buildLeafGeometry(s);
+        updateConstraintStatuses(leaf);
+        document.getElementById("apertureTag").textContent = `${model.count} pins / step ${fmt(model.step, 2)}deg`;
+        document.getElementById("leafTag").textContent = `S${s.index} -> R${r.index}`;
+        document.getElementById("coordinateTag").textContent = `pin gap ${fmt(distance(s, r), 3)}mm`;
+        const rows = document.getElementById("coordinateRows");
+        rows.innerHTML = "";
+        const items = [
+          { label: "Stator", index: s.index, x: s.x, y: s.y, note: `${fmt(s.angleFromY, 4)}deg from +Y CCW` },
+          { label: "Rotor", index: r.index, x: r.x, y: r.y, note: `${fmt(r.angleFromY, 4)}deg from +Y CCW` },
+          { label: "D_F6.0 Center", index: "-", x: leaf.df6Center.x, y: leaf.df6Center.y, note: `distance to S = ${fmt(distance(s, leaf.df6Center), 4)}mm` },
+          { label: "D_min Center", index: "-", x: leaf.dMinCircle.center.x, y: leaf.dMinCircle.center.y, note: `D_min = ${fmt(leaf.dMinCircle.radius * 2, 4)}mm, tangent to hidden infinite L1 line` },
+          { label: "P1", index: "-", x: leaf.p1.x, y: leaf.p1.y, note: `${fmt(state.theta_1, 4)}deg CW from +X` },
+          { label: "L0 Start", index: "-", x: leaf.l0Start.x, y: leaf.l0Start.y, note: `L0 length = ${fmt(state.ex_line, 4)}mm` }
+        ];
+        if (leaf.df17Center) {
+          items.push({
+            label: "D_F1.7 Center",
+            index: "-",
+            x: leaf.df17Center.x,
+            y: leaf.df17Center.y,
+            note: `distance to L1 = ${fmt(state.D_F1_7 / 2, 4)}mm`
+          });
+          items.push({
+            label: "P2",
+            index: "-",
+            x: leaf.p2.x,
+            y: leaf.p2.y,
+            note: "L1 and D_F1.7 tangent"
+          });
+          items.push({
+            label: "P3",
+            index: "-",
+            x: leaf.p3.x,
+            y: leaf.p3.y,
+            note: `${fmt(state.theta_2, 4)}deg CW from P2 around D_F1.7`
+          });
+        }
+        if (leaf.df147Center) {
+          items.push({
+            label: "D_F1.47 Center",
+            index: "-",
+            x: leaf.df147Center.x,
+            y: leaf.df147Center.y,
+            note: `distance to L2 = ${fmt(state.D_F1_47 / 2, 4)}mm`
+          });
+          items.push({
+            label: "P4",
+            index: "-",
+            x: leaf.p4.x,
+            y: leaf.p4.y,
+            note: "L2 and D_F1.47 tangent"
+          });
+          items.push({
+            label: "D_max Center",
+            index: "-",
+            x: leaf.dMaxCircle.center.x,
+            y: leaf.dMaxCircle.center.y,
+            note: `D_max = ${fmt(leaf.dMaxCircle.radius * 2, 4)}mm, tangent to extended L2`
+          });
+          items.push({
+            label: "P5",
+            index: "-",
+            x: leaf.p5.x,
+            y: leaf.p5.y,
+            note: "extended L2 and D_max tangent"
+          });
+          items.push({
+            label: "Arc Tangency",
+            index: constraintEnabled("arcTangency")
+              ? (Number.isFinite(leaf.thetaSolveResidual) && leaf.thetaSolveResidual <= ARC_TANGENCY_TOLERANCE ? "OK" : "NG")
+              : "OFF",
+            x: leaf.slPoints[2].point.x,
+            y: leaf.slPoints[2].point.y,
+            note: `residual = ${fmt(leaf.thetaSolveResidual, 8)}, tolerance = ${fmt(ARC_TANGENCY_TOLERANCE, 4)}`
+          });
+          if (leaf.slThetas) {
+            items.push({
+              label: "SL Theta Solve",
+              index: "-",
+              x: leaf.slThetas.sl1,
+              y: leaf.slThetas.sl3,
+              note: `SL1=SL0+0.7deg, SL3=SL4-0.7deg, SL2=${fmt(leaf.slThetas.sl2, 4)}deg`
+            });
+          }
+          items.push({
+            label: "P X Order",
+            index: constraintEnabled("pointXOrder") ? (leaf.pointOrder.valid ? "OK" : "NG") : "OFF",
+            x: leaf.pointOrder.minGap,
+            y: leaf.dMinCircle.radius * 2,
+            note: `${leaf.pointOrder.label}, min x-gap = ${fmt(leaf.pointOrder.minGap, 4)}mm`
+          });
+          items.push({
+            label: "D_min > 1.00",
+            index: constraintEnabled("dMinGtOne") ? (leaf.dMinCircle.radius * 2 > 1 ? "OK" : "NG") : "OFF",
+            x: leaf.dMinCircle.radius * 2,
+            y: 1,
+            note: `current D_min = ${fmt(leaf.dMinCircle.radius * 2, 4)}mm`
+          });
+          if (leaf.diameterOrder) {
+            items.push({
+              label: "Diameter Order",
+              index: constraintEnabled("diameterOrder") ? (leaf.diameterOrder.valid ? "OK" : "NG") : "OFF",
+              x: leaf.diameterOrder.minGap,
+              y: leaf.dMinCircle.radius * 2,
+              note: leaf.diameterOrder.label
+            });
+          }
+          if (leaf.dMinLeftArcTangent) {
+            items.push({
+              label: "D_min Line/Arc",
+              index: constraintEnabled("dMinLeftArcTangent") ? (leaf.dMinLeftArcTangent.valid ? "OK" : "NG") : "OFF",
+              x: leaf.dMinLeftArcTangent.signedDistance,
+              y: leaf.dMinLeftArcTangent.arcResidual,
+              note: leaf.dMinLeftArcTangent.label
+            });
+          }
+          if (leaf.pressureRange) {
+            items.push({
+              label: "Pressure Range",
+              index: constraintEnabled("pressureRange") ? (leaf.pressureRange.valid ? "OK" : "NG") : "OFF",
+              x: leaf.pressureRange.minAngle,
+              y: leaf.pressureRange.maxAngle,
+              note: `0 < epsilon(+) < 90deg, invalid = ${leaf.pressureRange.invalidLabels.join(", ") || "-"}`
+            });
+          }
+          if (leaf.pressureTargets) {
+            items.push({
+              label: "Pressure Target",
+              index: constraintEnabled("pressureTarget") ? (leaf.pressureTargets.valid ? "OK" : "NG") : "OFF",
+              x: leaf.pressureTargets.maxAbsError,
+              y: state.Pressure_angle,
+              note: leaf.pressureTargets.targets
+                .map((item) => `${item.label}=${fmt(item.angle, 4)}deg, delta=${fmt(item.error, 4)}deg`)
+                .join("; ")
+            });
+          }
+          if (leaf.slArcData?.arcCenterSide) {
+            items.push({
+              label: "Arc Center Side",
+              index: constraintEnabled("arcCenterLeft") ? (leaf.slArcData.arcCenterSide.valid ? "OK" : "NG") : "OFF",
+              x: leaf.slArcData.arcCenterSide.arc1DeltaX,
+              y: leaf.slArcData.arcCenterSide.arc2DeltaX,
+              note: `required: Arc1.cx - SL2.x < 0 and Arc2.cx - SL2.x < 0`
+            });
+          }
+        }
+        for (const item of leaf.slPoints) {
+          const epsilonNote = Number.isFinite(item.epsilon) ? `, epsilon(+) = ${fmt(item.epsilon, 4)}deg` : "";
+          const rangeNote = item.arcNormalVector ? `, range = ${item.pressureAngleValid ? "OK" : "NG"}` : "";
+          const targetNote = ["SL0", "SL2", "SL4"].includes(item.label) && Number.isFinite(item.epsilon)
+            ? `, target delta = ${fmt(item.epsilon - state.Pressure_angle, 4)}deg`
+            : "";
+          items.push({
+            label: item.label,
+            index: "-",
+            x: item.point.x,
+            y: item.point.y,
+            note: `center (${fmt(item.center.x, 4)}, ${fmt(item.center.y, 4)}), center-S = ${fmt(distance(item.center, s), 4)}mm, theta = ${fmt(item.theta, 4)}deg${epsilonNote}${rangeNote}${targetNote}`
+          });
+        }
+        for (const item of items) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${item.label}</td>
+            <td>${item.index}</td>
+            <td>${fmt(item.x, 4)}</td>
+            <td>${fmt(item.y, 4)}</td>
+            <td>${item.note}</td>
+          `;
+          rows.appendChild(tr);
+        }
+      }
+
+      function render() {
+        const model = buildPins();
+        updateLeafPinControls(model);
+        const leaf = getLeafGeometry(model.reference);
+        drawVariableAperture(model);
+        drawLeaf(model, leaf);
+        updateText(model, leaf);
+      }
+
+      let renderQueued = false;
+
+      function requestRender() {
+        if (renderQueued) return;
+        renderQueued = true;
+        window.requestAnimationFrame(() => {
+          renderQueued = false;
+          render();
+        });
+      }
+
+      function geometryCacheKey(statorPin) {
+        const values = inputDefs.map((def) => `${def.key}:${state[def.key]}`).join("|");
+        const constraints = constraintDefs.map((def) => `${def.key}:${constraintEnabled(def.key) ? 1 : 0}`).join("|");
+        return `${statorPin.index}|${values}|${constraints}`;
+      }
+
+      function getLeafGeometry(statorPin) {
+        const key = geometryCacheKey(statorPin);
+        if (leafGeometryCache.key !== key) {
+          leafGeometryCache.key = key;
+          leafGeometryCache.value = buildLeafGeometry(statorPin);
+        }
+        return leafGeometryCache.value;
+      }
+
+      function invalidateLeafGeometryCache() {
+        leafGeometryCache.key = "";
+        leafGeometryCache.value = null;
+      }
+
+      function canAcceptCurrentState() {
+        try {
+          const model = buildPins();
+          const leaf = getLeafGeometry(model.reference);
+          const statuses = constraintStatuses(leaf);
+          return constraintDefs.every((def) => def.blocking === false || !constraintEnabled(def.key) || statuses[def.key]?.valid === true);
+        } catch (error) {
+          return false;
+        }
+      }
+
+      function buildControls() {
+        for (const def of inputDefs) {
+          const control = document.createElement("div");
+          control.className = "control";
+          const label = document.createElement("label");
+          label.htmlFor = `${def.key}-range`;
+          label.textContent = `${def.label} (${def.unit})`;
+          const row = document.createElement("div");
+          row.className = "control-row";
+          const range = document.createElement("input");
+          range.type = "range";
+          range.id = `${def.key}-range`;
+          range.min = def.min;
+          range.max = def.max;
+          range.step = def.step;
+          range.value = state[def.key];
+          const number = document.createElement("input");
+          number.type = "number";
+          number.id = `${def.key}-number`;
+          number.min = def.min;
+          number.max = def.max;
+          number.step = def.step;
+          number.value = state[def.key];
+          const sync = (rawValue) => {
+            const previousValue = state[def.key];
+            const value = def.step === 1 ? Math.round(Number(rawValue)) : Number(rawValue);
+            state[def.key] = Math.max(def.min, Math.min(def.max, value));
+            invalidateLeafGeometryCache();
+            if (!canAcceptCurrentState()) {
+              state[def.key] = previousValue;
+              invalidateLeafGeometryCache();
+            }
+            range.value = state[def.key];
+            number.value = state[def.key];
+            requestRender();
+          };
+          range.addEventListener("input", (event) => sync(event.target.value));
+          number.addEventListener("input", (event) => sync(event.target.value));
+          row.append(range, number);
+          control.append(label, row);
+          controls.appendChild(control);
+        }
+      }
+
+      function updateLeafPinControls(model) {
+        ensureLeafPinVisibility(model);
+        const signature = `${model.count}:${model.reference.index}`;
+        if (pinControlSignature === signature) {
+          for (const pin of model.stator) {
+            const checkbox = document.querySelector(`[data-leaf-pin-index="${pin.index}"]`);
+            if (checkbox) checkbox.checked = !!leafPinVisibility[String(pin.index)];
+          }
+          return;
+        }
+        pinControlSignature = signature;
+        pinControls.innerHTML = "";
+
+        const actions = document.createElement("div");
+        actions.className = "pin-actions";
+        const referenceOnly = document.createElement("button");
+        referenceOnly.className = "button";
+        referenceOnly.type = "button";
+        referenceOnly.textContent = "Reference only";
+        const showAll = document.createElement("button");
+        showAll.className = "button";
+        showAll.type = "button";
+        showAll.textContent = "Show all";
+        const hideAll = document.createElement("button");
+        hideAll.className = "button";
+        hideAll.type = "button";
+        hideAll.textContent = "Hide all";
+        referenceOnly.addEventListener("click", () => {
+          for (const pin of model.stator) {
+            leafPinVisibility[String(pin.index)] = pin.index === model.reference.index;
+          }
+          pinControlSignature = "";
+          requestRender();
+        });
+        showAll.addEventListener("click", () => {
+          for (const pin of model.stator) leafPinVisibility[String(pin.index)] = true;
+          pinControlSignature = "";
+          requestRender();
+        });
+        hideAll.addEventListener("click", () => {
+          for (const pin of model.stator) leafPinVisibility[String(pin.index)] = false;
+          pinControlSignature = "";
+          requestRender();
+        });
+        actions.append(referenceOnly, showAll, hideAll);
+
+        const grid = document.createElement("div");
+        grid.className = "pin-grid";
+        for (const pin of model.stator) {
+          const label = document.createElement("label");
+          label.className = "pin-item";
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.checked = !!leafPinVisibility[String(pin.index)];
+          checkbox.dataset.leafPinIndex = pin.index;
+          const text = document.createElement("span");
+          text.textContent = `S${pin.index}/R${pin.index}`;
+          checkbox.addEventListener("change", () => {
+            leafPinVisibility[String(pin.index)] = checkbox.checked;
+            requestRender();
+          });
+          label.append(checkbox, text);
+          grid.appendChild(label);
+        }
+        pinControls.append(actions, grid);
+      }
+
+      function buildConstraintControls() {
+        for (const def of constraintDefs) {
+          const label = document.createElement("label");
+          label.className = "constraint-item";
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.checked = constraintState[def.key];
+          checkbox.dataset.constraintKey = def.key;
+          const content = document.createElement("span");
+          const title = document.createElement("span");
+          title.className = "constraint-title";
+          title.textContent = def.label;
+          const note = document.createElement("span");
+          note.className = "constraint-note";
+          note.dataset.constraintNote = def.key;
+          note.textContent = def.note;
+          const status = document.createElement("span");
+          status.className = "constraint-status";
+          status.dataset.constraintStatus = def.key;
+          status.textContent = def.enabled ? "OK" : "OFF";
+          content.append(title, note);
+          checkbox.addEventListener("change", () => {
+            constraintState[def.key] = checkbox.checked;
+            invalidateLeafGeometryCache();
+            requestRender();
+          });
+          label.append(checkbox, content, status);
+          constraintControls.appendChild(label);
+        }
+      }
+
+      function setupZoomControls() {
+        document.querySelectorAll("[data-zoom-target]").forEach((button) => {
+          button.addEventListener("click", () => {
+            changeZoom(button.dataset.zoomTarget, button.dataset.zoomAction);
+          });
+        });
+        [
+          { key: "aperture", canvas: apertureCanvas },
+          { key: "leaf", canvas: leafCanvas }
+        ].forEach(({ key, canvas }) => {
+          canvas.addEventListener("wheel", (event) => {
+            event.preventDefault();
+            changeZoom(key, event.deltaY < 0 ? "in" : "out");
+          }, { passive: false });
+        });
+      }
+
+      function setupDragControls() {
+        [
+          { key: "aperture", canvas: apertureCanvas },
+          { key: "leaf", canvas: leafCanvas }
+        ].forEach(({ key, canvas }) => {
+          let dragging = false;
+          let lastX = 0;
+          let lastY = 0;
+          canvas.addEventListener("pointerdown", (event) => {
+            dragging = true;
+            lastX = event.clientX;
+            lastY = event.clientY;
+            canvas.setPointerCapture(event.pointerId);
+          });
+          canvas.addEventListener("pointermove", (event) => {
+            if (!dragging) return;
+            const deltaX = event.clientX - lastX;
+            const deltaY = event.clientY - lastY;
+            lastX = event.clientX;
+            lastY = event.clientY;
+            panGraph(key, deltaX, deltaY);
+          });
+          const stopDrag = (event) => {
+            dragging = false;
+            if (canvas.hasPointerCapture(event.pointerId)) {
+              canvas.releasePointerCapture(event.pointerId);
+            }
+          };
+          canvas.addEventListener("pointerup", stopDrag);
+          canvas.addEventListener("pointercancel", stopDrag);
+          canvas.addEventListener("pointerleave", () => {
+            dragging = false;
+          });
+        });
+      }
+
+      function resetDefaults() {
+        Object.assign(state, defaults);
+        zoomState.aperture = 1;
+        zoomState.leaf = 1;
+        panState.aperture.x = 0;
+        panState.aperture.y = 0;
+        panState.leaf.x = 0;
+        panState.leaf.y = 0;
+        Object.assign(constraintState, constraintDefaults);
+        for (const key of Object.keys(leafPinVisibility)) delete leafPinVisibility[key];
+        pinControlSignature = "";
+        invalidateLeafGeometryCache();
+        for (const def of inputDefs) {
+          document.getElementById(`${def.key}-range`).value = state[def.key];
+          document.getElementById(`${def.key}-number`).value = state[def.key];
+        }
+        for (const def of constraintDefs) {
+          const checkbox = document.querySelector(`[data-constraint-key="${def.key}"]`);
+          if (checkbox) checkbox.checked = constraintState[def.key];
+        }
+        requestRender();
+      }
+
+      buildControls();
+      buildConstraintControls();
+      setupZoomControls();
+      setupDragControls();
+      document.getElementById("resetButton").addEventListener("click", resetDefaults);
+      window.addEventListener("resize", requestRender);
+      render();
     </script>
   </body>
 </html>

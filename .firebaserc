@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "uniwani-budget-240225"
+  },
+  "targets": {
+    "uniwani-budget-240225": {
+      "hosting": {
+        "variable-aperture": [
+          "variable-aperture"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

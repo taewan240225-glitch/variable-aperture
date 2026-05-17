@@ -6,3 +6,6 @@ venv/
 *.xlsx
 *.xls
 *.png
+*.csv
+.firebase/
+.firebase/**

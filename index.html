@@ -1287,13 +1287,12 @@
 
         const pinRadius = state.Pin_Size / 2;
         const r5 = leafRotorPinForIndex(model, leaf, 5);
-        const r3 = leafRotorPinForIndex(model, leaf, 3);
-        if (!r5 || !r3) return null;
+        if (!r5) return null;
 
         const l0Direction = normalizeVector(subtract(leaf.p1, leaf.l0Start));
         const firstDirection = normalizeVector(rotateVector(l0Direction, 80));
         const r5Guide = { x: r5.x - pinRadius - 0.5, y: r5.y };
-        const r3Guide = { x: r3.x + pinRadius + 1, y: r3.y };
+        const connectorGuide = { x: model.reference.x - 1, y: model.reference.y };
         const firstLength = clamp(distance(leaf.l0Start, r5Guide) * 0.38, 1.2, 3.8);
         const firstEnd = add(leaf.l0Start, scaleVector(firstDirection, firstLength));
 
@@ -1331,43 +1330,31 @@
 
         const p5Direction = normalizeVector(subtract(leaf.p5, leaf.p4));
         const p5Line = { point: leaf.p5, direction: p5Direction };
-        const p5LegDirection = normalizeVector(subtract(leaf.p5, leaf.p4));
-        const connectorCandidates = [120, -120].flatMap((angle) => {
-          const direction = normalizeVector(rotateVector(p5LegDirection, angle));
-          const connectorLine = { point: r3Guide, direction };
-          const p5ExtensionEnd = lineLineIntersection(connectorLine, p5Line);
-          if (!p5ExtensionEnd) return [];
-          const extensionT = dot(subtract(p5ExtensionEnd, connectorLine.point), connectorLine.direction);
-          return lineCircleIntersections(connectorLine, leaf.dMinCircle.center, dMinLimitRadius).map((hit) => {
-            const dMinClockwise = arcStartsLeft(leaf.dMinCircle.center, dMinLimitRadius, limitJoin, hit.point, true)
-              ? true
-              : false;
-            const startsLeft = arcStartsLeft(leaf.dMinCircle.center, dMinLimitRadius, limitJoin, hit.point, dMinClockwise);
-            const smallAngle = angleBetweenVectors(direction, p5LegDirection);
-            const displayAngle = smallAngle < 90 ? 180 - smallAngle : smallAngle;
-            const r3Between = (hit.t <= 0 && extensionT >= 0) || (hit.t >= 0 && extensionT <= 0);
-            return {
-              connectorLine,
-              p5ExtensionEnd,
-              dMinExit: hit.point,
-              dMinClockwise,
-              startsLeft,
-              r3Between,
-              angleError: Math.abs(displayAngle - 120),
-              sweep: arcSweepMagnitude(leaf.dMinCircle.center, limitJoin, hit.point, dMinClockwise),
-              extensionLength: distance(p5ExtensionEnd, leaf.p5)
-            };
-          });
+        const connectorLine = { point: connectorGuide, direction: { x: 0, y: 1 } };
+        const p5ExtensionEnd = lineLineIntersection(connectorLine, p5Line)
+          ?? { x: connectorGuide.x, y: leaf.p5.y };
+        const connectorCandidates = lineCircleIntersections(connectorLine, leaf.dMinCircle.center, dMinLimitRadius).map((hit) => {
+          const dMinClockwise = arcStartsLeft(leaf.dMinCircle.center, dMinLimitRadius, limitJoin, hit.point, true)
+            ? true
+            : false;
+          const startsLeft = arcStartsLeft(leaf.dMinCircle.center, dMinLimitRadius, limitJoin, hit.point, dMinClockwise);
+          return {
+            dMinExit: hit.point,
+            dMinClockwise,
+            startsLeft,
+            sweep: arcSweepMagnitude(leaf.dMinCircle.center, limitJoin, hit.point, dMinClockwise),
+            guideDistance: distance(hit.point, connectorGuide),
+            extensionDistance: distance(hit.point, p5ExtensionEnd)
+          };
         });
         const connectorChoice = choosePoint(connectorCandidates, (candidate) => (
-          (candidate.startsLeft ? 0 : 10000) +
-          (candidate.r3Between ? 0 : 5000) +
-          candidate.angleError * 100 +
+          (candidate.sweep > Math.PI ? 500 : 0) +
+          (candidate.startsLeft ? 0 : 5) +
           candidate.sweep +
-          Math.abs(candidate.extensionLength - 3) * 0.05
+          candidate.guideDistance * 0.02 +
+          candidate.extensionDistance * 0.01
         ));
-        const p5ExtensionEnd = connectorChoice?.p5ExtensionEnd ?? projectPointToLine(r3Guide, p5Line);
-        const dMinExit = connectorChoice?.dMinExit ?? pointOnCircleToward(leaf.dMinCircle.center, dMinLimitRadius, r3Guide);
+        const dMinExit = connectorChoice?.dMinExit ?? pointOnCircleToward(leaf.dMinCircle.center, dMinLimitRadius, connectorGuide);
         const dMinClockwise = connectorChoice?.dMinClockwise ?? true;
         const arc2Clockwise = clockwiseForArcVia(arc2.center, arc2Start, arc2End, arc2Via);
         const dMaxClockwise = clockwiseForShorterArc(leaf.dMaxCircle.center, arc2End, limitJoin);
@@ -1392,7 +1379,7 @@
           dMinVia: lowerCirclePoint(leaf.dMinCircle.center, dMinLimitRadius),
           dMinClockwise,
           dMinExit,
-          r3Guide,
+          connectorGuide,
           p5ExtensionEnd,
           p5: leaf.p5,
           boundsPoints: [
@@ -1406,7 +1393,7 @@
             lowerCirclePoint(leaf.dMaxCircle.center, dMaxLimitRadius),
             lowerCirclePoint(leaf.dMinCircle.center, dMinLimitRadius),
             dMinExit,
-            r3Guide,
+            connectorGuide,
             p5ExtensionEnd,
             leaf.p5
           ]

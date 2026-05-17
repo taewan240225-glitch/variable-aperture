@@ -34,6 +34,9 @@ Variable_Aperture_Design is a browser app for checking variable aperture geometr
 - The Leaf Pins visibility controls apply D-centered placement. For each D state, the pin pattern center is the D circle center, and the pattern is rotation-corrected so the reference `S4` aligns with the original stator pin.
 - By default only the reference pair `S4/R4` is visible for `Pin_Num = 9`; other `S0/R0` through `S8/R8` pairs can be shown or hidden individually.
 - Visible rotor pins include their D-centered drive path from `SL0 theta` to `SL4 theta`.
+- The data panel has two pages:
+  - Page 1 `Reference`: law rows from `SL0 theta` through `SL4 theta` in 1 deg steps. Each row solves the D center so the rotor pin remains on the active slot arc, then reports `theta`, `beta`, `beta/theta`, `R/L`, `alpha`, `d`, `p`, `epsilon`, `F_r`, and `T_out/T_in`.
+  - Page 2 `Coordinates`: detailed point and constraint coordinates.
 - `SL0` through `SL4` centers stay on the circle at distance `Rs` from the reference stator pin.
 - `SL1`, `SL2`, and `SL3` use the D_F6.0, D_F1.7, and D_F1.47 centers. `SL0` uses the computed D_min center, and `SL4` uses the computed D_max center.
 - D_min is tangent to the hidden infinite L1 line, not constrained to the visible L0 segment. D_max is tangent to the extended L2 line at P5.

@@ -381,6 +381,35 @@
         font-weight: 720;
       }
 
+      .data-tabs {
+        display: inline-flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .tab-button {
+        min-height: 30px;
+        padding: 5px 10px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--surface);
+        color: var(--ink);
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .tab-button.active {
+        border-color: var(--stator);
+        background: var(--stator);
+        color: #fff;
+      }
+
+      .data-page[hidden] {
+        display: none;
+      }
+
       @media (max-width: 1040px) {
         main {
           grid-template-columns: 1fr;
@@ -479,21 +508,49 @@
 
           <section class="data-panel">
             <div class="section-head">
-              <h2>Reference Coordinates</h2>
-              <span class="tag" id="coordinateTag">-</span>
+              <h2>Reference Data</h2>
+              <div class="data-tabs" role="tablist" aria-label="Reference data pages">
+                <button class="tab-button active" type="button" data-data-page="reference">1 Reference</button>
+                <button class="tab-button" type="button" data-data-page="coordinates">2 Coordinates</button>
+              </div>
             </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Point</th>
-                  <th>Index</th>
-                  <th>X (mm)</th>
-                  <th>Y (mm)</th>
-                  <th>Angle / Note</th>
-                </tr>
-              </thead>
-              <tbody id="coordinateRows"></tbody>
-            </table>
+            <div class="data-page" data-page-panel="reference">
+              <table>
+                <thead>
+                  <tr>
+                    <th>&theta; (deg)</th>
+                    <th>&beta; (deg)</th>
+                    <th>&beta;/&theta; (-)</th>
+                    <th>R/L (-)</th>
+                    <th>&alpha; (deg)</th>
+                    <th>d (mm)</th>
+                    <th>p (mm)</th>
+                    <th>&epsilon; (deg)</th>
+                    <th>F<sub>r</sub> (mN)[@T<sub>in</sub> = 100uNm]</th>
+                    <th>T<sub>out</sub>/T<sub>in</sub> (-)</th>
+                  </tr>
+                </thead>
+                <tbody id="referenceRows"></tbody>
+              </table>
+            </div>
+            <div class="data-page" data-page-panel="coordinates" hidden>
+              <div class="section-head">
+                <h2>Reference Coordinates</h2>
+                <span class="tag" id="coordinateTag">-</span>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Point</th>
+                    <th>Index</th>
+                    <th>X (mm)</th>
+                    <th>Y (mm)</th>
+                    <th>Angle / Note</th>
+                  </tr>
+                </thead>
+                <tbody id="coordinateRows"></tbody>
+              </table>
+            </div>
           </section>
         </section>
       </main>
@@ -526,6 +583,12 @@
       const state = { ...defaults };
       const ARC_TANGENCY_TOLERANCE = 0.02;
       const HARD_CONSTRAINT_PENALTY = 1e12;
+      const LEAF_PROFILE_COLOR = "#c2410c";
+      const LEAF_GROUP_COLORS = [
+        { stroke: "#0f766e", fill: "rgba(15, 118, 110, 0.13)" },
+        { stroke: "#2563eb", fill: "rgba(37, 99, 235, 0.12)" },
+        { stroke: "#c2410c", fill: "rgba(194, 65, 12, 0.12)" }
+      ];
       const constraintDefs = [
         {
           key: "arcTangency",
@@ -867,6 +930,26 @@
         ctx.restore();
       }
 
+      function drawClosedPolyline(view, points, stroke, fill, width = 1.4) {
+        if (points.length < 3) return;
+        const { ctx } = view;
+        const first = view.point(points[0]);
+        ctx.save();
+        ctx.strokeStyle = stroke;
+        ctx.fillStyle = fill;
+        ctx.lineWidth = width;
+        ctx.beginPath();
+        ctx.moveTo(first[0], first[1]);
+        for (let index = 1; index < points.length; index += 1) {
+          const point = view.point(points[index]);
+          ctx.lineTo(point[0], point[1]);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
       function drawArcBetween(view, center, radius, startPoint, endPoint, color, clockwise = false) {
         const start = Math.atan2(startPoint.y - center.y, startPoint.x - center.x);
         let end = Math.atan2(endPoint.y - center.y, endPoint.x - center.x);
@@ -918,6 +1001,65 @@
           });
         }
         drawPolyline(view, points, color, 2.2);
+      }
+
+      function circleArcPoints(center, radius, startPoint, endPoint, clockwise = false) {
+        const start = Math.atan2(startPoint.y - center.y, startPoint.x - center.x);
+        let end = Math.atan2(endPoint.y - center.y, endPoint.x - center.x);
+        if (clockwise && end > start) end -= TAU;
+        if (!clockwise && end < start) end += TAU;
+        const steps = Math.max(12, Math.ceil(Math.abs(end - start) / (Math.PI / 64)));
+        const points = [];
+        for (let index = 0; index <= steps; index += 1) {
+          const angle = start + (end - start) * (index / steps);
+          points.push({
+            x: center.x + radius * Math.cos(angle),
+            y: center.y + radius * Math.sin(angle)
+          });
+        }
+        return points;
+      }
+
+      function drawCircleArc(view, center, radius, startPoint, endPoint, clockwise, color, width = 2) {
+        drawPolyline(view, circleArcPoints(center, radius, startPoint, endPoint, clockwise), color, width);
+      }
+
+      function clockwiseForArcVia(center, startPoint, endPoint, viaPoint) {
+        if (!viaPoint) return false;
+        const start = Math.atan2(startPoint.y - center.y, startPoint.x - center.x);
+        const end = Math.atan2(endPoint.y - center.y, endPoint.x - center.x);
+        const via = Math.atan2(viaPoint.y - center.y, viaPoint.x - center.x);
+        return !angleBetween(start, end, via, true);
+      }
+
+      function clockwiseForShorterArc(center, startPoint, endPoint) {
+        const start = Math.atan2(startPoint.y - center.y, startPoint.x - center.x);
+        const end = Math.atan2(endPoint.y - center.y, endPoint.x - center.x);
+        const ccwSweep = ((end - start) % TAU + TAU) % TAU;
+        return ccwSweep > Math.PI;
+      }
+
+      function arcSweepMagnitude(center, startPoint, endPoint, clockwise) {
+        const start = Math.atan2(startPoint.y - center.y, startPoint.x - center.x);
+        const end = Math.atan2(endPoint.y - center.y, endPoint.x - center.x);
+        const ccwSweep = ((end - start) % TAU + TAU) % TAU;
+        return clockwise ? TAU - ccwSweep : ccwSweep;
+      }
+
+      function arcStartsLeft(center, radius, startPoint, endPoint, clockwise) {
+        const points = circleArcPoints(center, radius, startPoint, endPoint, clockwise);
+        return points.length > 1 && points[1].x < startPoint.x - 1e-6;
+      }
+
+      function arcThroughPointsArray(startPoint, midPoint, endPoint) {
+        const circle = circleFrom3Points(startPoint, midPoint, endPoint);
+        if (!circle) return [startPoint, endPoint];
+        const radius = distance(circle.center, startPoint);
+        const start = Math.atan2(startPoint.y - circle.center.y, startPoint.x - circle.center.x);
+        const mid = Math.atan2(midPoint.y - circle.center.y, midPoint.x - circle.center.x);
+        const end = Math.atan2(endPoint.y - circle.center.y, endPoint.x - circle.center.x);
+        const clockwise = !angleBetween(start, end, mid, true);
+        return circleArcPoints(circle.center, radius, startPoint, endPoint, clockwise);
       }
 
       function angleBetween(start, end, angle, ccw) {
@@ -1025,7 +1167,291 @@
         }
       }
 
-      function apertureBounds(model) {
+      function leafRotorPinForIndex(model, leaf, requestedIndex, orderIndex = 4) {
+        const states = dCenterStates(leaf);
+        const dState = states[orderIndex] ?? states[states.length - 1];
+        if (!dState || model.count < 1) return null;
+        const index = Math.min(Math.max(0, requestedIndex), model.count - 1);
+        return leafRotorPinAtD(model, dState.center, index, dState.theta);
+      }
+
+      function pointOnCircleToward(center, radius, point) {
+        return add(center, scaleVector(normalizeVector(subtract(point, center)), radius));
+      }
+
+      function lowerCirclePoint(center, radius) {
+        return { x: center.x, y: center.y - radius };
+      }
+
+      function choosePoint(points, score) {
+        if (!points.length) return null;
+        return points.reduce((best, point) => (score(point) < score(best) ? point : best), points[0]);
+      }
+
+      function leafProfilePathPoints(leaf, outline) {
+        if (!outline || !leaf.df17Center || !leaf.p1 || !leaf.p2 || !leaf.p3 || !leaf.p4 || !leaf.p5) {
+          return null;
+        }
+        const outerPoints = [
+          outline.firstStart,
+          outline.firstEnd,
+          outline.arc2Start,
+          ...circleArcPoints(
+            outline.arc2Center,
+            outline.arc2Radius,
+            outline.arc2Start,
+            outline.arc2End,
+            outline.arc2Clockwise
+          ).slice(1),
+          ...circleArcPoints(
+            outline.dMaxCenter,
+            outline.dMaxRadius,
+            outline.arc2End,
+            outline.limitJoin,
+            outline.dMaxClockwise
+          ).slice(1),
+          ...circleArcPoints(
+            outline.dMinCenter,
+            outline.dMinRadius,
+            outline.limitJoin,
+            outline.dMinExit,
+            outline.dMinClockwise
+          ).slice(1),
+          outline.p5ExtensionEnd,
+          outline.p5
+        ];
+        const innerArc = circleArcPoints(leaf.df17Center, state.D_F1_7 / 2, leaf.p3, leaf.p2, false);
+        const innerPoints = [
+          outline.p5,
+          leaf.p4,
+          leaf.p3,
+          ...innerArc.slice(1),
+          leaf.p1,
+          outline.firstStart
+        ];
+        return {
+          outerPoints,
+          innerPoints,
+          closedPoints: [...outerPoints, ...innerPoints.slice(1)]
+        };
+      }
+
+      function buildSlotLinePoints(leaf) {
+        if (!leaf?.slPoints || leaf.slPoints.length < 5) return [];
+        const arc1 = arcThroughPointsArray(leaf.slPoints[0].point, leaf.slPoints[1].point, leaf.slPoints[2].point);
+        const arc2 = arcThroughPointsArray(leaf.slPoints[2].point, leaf.slPoints[3].point, leaf.slPoints[4].point);
+        return [...arc1, ...arc2.slice(1)];
+      }
+
+      function transformedLeafBodyPoints(points, transform) {
+        return points.map((point) => add(
+          transform.targetPivot,
+          rotateVector(subtract(point, transform.sourcePivot), transform.rotationDeg)
+        ));
+      }
+
+      function leafBodyTransform(model, leaf, index, driveLaw) {
+        const sourcePivot = model.reference;
+        const targetPivot = model.stator[index];
+        const fallbackRotation = (index - model.reference.index) * model.step;
+        if (!targetPivot || !driveLaw?.rotor) {
+          return { sourcePivot, targetPivot: targetPivot ?? sourcePivot, rotationDeg: fallbackRotation };
+        }
+        const sourceRotorVector = subtract(driveLaw.rotor, sourcePivot);
+        const targetRotorVector = subtract(model.rotor[index], targetPivot);
+        const sourceLength = Math.hypot(sourceRotorVector.x, sourceRotorVector.y);
+        const targetLength = Math.hypot(targetRotorVector.x, targetRotorVector.y);
+        if (sourceLength < 1e-9 || targetLength < 1e-9) {
+          return { sourcePivot, targetPivot, rotationDeg: fallbackRotation };
+        }
+        return {
+          sourcePivot,
+          targetPivot,
+          rotationDeg: angleOfVector(targetRotorVector) - angleOfVector(sourceRotorVector)
+        };
+      }
+
+      function buildLeafProfileOutline(model, leaf) {
+        if (
+          !leaf?.l0Start ||
+          !leaf.p1 ||
+          !leaf.p4 ||
+          !leaf.p5 ||
+          !leaf.dMinCircle ||
+          !leaf.dMaxCircle ||
+          !leaf.slArcData?.arc2 ||
+          !leaf.slThetas
+        ) {
+          return null;
+        }
+
+        const pinRadius = state.Pin_Size / 2;
+        const r5 = leafRotorPinForIndex(model, leaf, 5);
+        const r3 = leafRotorPinForIndex(model, leaf, 3);
+        if (!r5 || !r3) return null;
+
+        const l0Direction = normalizeVector(subtract(leaf.p1, leaf.l0Start));
+        const firstDirection = normalizeVector(rotateVector(l0Direction, 80));
+        const r5Guide = { x: r5.x - pinRadius - 0.5, y: r5.y };
+        const r3Guide = { x: r3.x + pinRadius + 1, y: r3.y };
+        const firstLength = clamp(distance(leaf.l0Start, r5Guide) * 0.38, 1.2, 3.8);
+        const firstEnd = add(leaf.l0Start, scaleVector(firstDirection, firstLength));
+
+        const lineToR5 = lineFromPoints(firstEnd, r5Guide);
+        const arc2 = leaf.slArcData.arc2;
+        const arc2OffsetRadius = arc2.radius + 1 + pinRadius;
+        const lineArcHits = lineCircleIntersections(lineToR5, arc2.center, arc2OffsetRadius);
+        const r5T = dot(subtract(r5Guide, lineToR5.point), lineToR5.direction);
+        const arc2StartHit = choosePoint(
+          lineArcHits.filter((hit) => hit.t >= r5T - 0.2),
+          (hit) => Math.abs(hit.t - r5T)
+        ) ?? choosePoint(lineArcHits, (hit) => Math.abs(hit.t - r5T));
+        const arc2Start = arc2StartHit?.point ?? r5Guide;
+
+        const dMaxLimitRadius = state.Leaf_max / 2;
+        const dMinLimitRadius = state.Leaf_max / 2;
+        const dMaxLimitHits = circleCircleIntersections(
+          arc2.center,
+          arc2OffsetRadius,
+          leaf.dMaxCircle.center,
+          dMaxLimitRadius
+        );
+        const arc2Via = pointOnCircleToward(arc2.center, arc2OffsetRadius, leaf.slPoints[3]?.point ?? leaf.slPoints[4]?.point);
+        const arc2End = choosePoint(dMaxLimitHits, (point) => distance(point, pointOnCircleToward(arc2.center, arc2OffsetRadius, leaf.slPoints[4].point)));
+        if (!arc2End) return null;
+
+        const limitIntersections = circleCircleIntersections(
+          leaf.dMaxCircle.center,
+          dMaxLimitRadius,
+          leaf.dMinCircle.center,
+          dMinLimitRadius
+        );
+        const limitJoin = choosePoint(limitIntersections, (point) => point.y);
+        if (!limitJoin) return null;
+
+        const p5Direction = normalizeVector(subtract(leaf.p5, leaf.p4));
+        const p5Line = { point: leaf.p5, direction: p5Direction };
+        const p5LegDirection = normalizeVector(subtract(leaf.p5, leaf.p4));
+        const connectorCandidates = [120, -120].flatMap((angle) => {
+          const direction = normalizeVector(rotateVector(p5LegDirection, angle));
+          const connectorLine = { point: r3Guide, direction };
+          const p5ExtensionEnd = lineLineIntersection(connectorLine, p5Line);
+          if (!p5ExtensionEnd) return [];
+          const extensionT = dot(subtract(p5ExtensionEnd, connectorLine.point), connectorLine.direction);
+          return lineCircleIntersections(connectorLine, leaf.dMinCircle.center, dMinLimitRadius).map((hit) => {
+            const dMinClockwise = arcStartsLeft(leaf.dMinCircle.center, dMinLimitRadius, limitJoin, hit.point, true)
+              ? true
+              : false;
+            const startsLeft = arcStartsLeft(leaf.dMinCircle.center, dMinLimitRadius, limitJoin, hit.point, dMinClockwise);
+            const smallAngle = angleBetweenVectors(direction, p5LegDirection);
+            const displayAngle = smallAngle < 90 ? 180 - smallAngle : smallAngle;
+            const r3Between = (hit.t <= 0 && extensionT >= 0) || (hit.t >= 0 && extensionT <= 0);
+            return {
+              connectorLine,
+              p5ExtensionEnd,
+              dMinExit: hit.point,
+              dMinClockwise,
+              startsLeft,
+              r3Between,
+              angleError: Math.abs(displayAngle - 120),
+              sweep: arcSweepMagnitude(leaf.dMinCircle.center, limitJoin, hit.point, dMinClockwise),
+              extensionLength: distance(p5ExtensionEnd, leaf.p5)
+            };
+          });
+        });
+        const connectorChoice = choosePoint(connectorCandidates, (candidate) => (
+          (candidate.startsLeft ? 0 : 10000) +
+          (candidate.r3Between ? 0 : 5000) +
+          candidate.angleError * 100 +
+          candidate.sweep +
+          Math.abs(candidate.extensionLength - 3) * 0.05
+        ));
+        const p5ExtensionEnd = connectorChoice?.p5ExtensionEnd ?? projectPointToLine(r3Guide, p5Line);
+        const dMinExit = connectorChoice?.dMinExit ?? pointOnCircleToward(leaf.dMinCircle.center, dMinLimitRadius, r3Guide);
+        const dMinClockwise = connectorChoice?.dMinClockwise ?? true;
+        const arc2Clockwise = clockwiseForArcVia(arc2.center, arc2Start, arc2End, arc2Via);
+        const dMaxClockwise = clockwiseForShorterArc(leaf.dMaxCircle.center, arc2End, limitJoin);
+
+        return {
+          firstStart: leaf.l0Start,
+          firstEnd,
+          r5Guide,
+          arc2Start,
+          arc2Center: arc2.center,
+          arc2Radius: arc2OffsetRadius,
+          arc2Via,
+          arc2Clockwise,
+          arc2End,
+          dMaxCenter: leaf.dMaxCircle.center,
+          dMaxRadius: dMaxLimitRadius,
+          dMaxVia: lowerCirclePoint(leaf.dMaxCircle.center, dMaxLimitRadius),
+          dMaxClockwise,
+          limitJoin,
+          dMinCenter: leaf.dMinCircle.center,
+          dMinRadius: dMinLimitRadius,
+          dMinVia: lowerCirclePoint(leaf.dMinCircle.center, dMinLimitRadius),
+          dMinClockwise,
+          dMinExit,
+          r3Guide,
+          p5ExtensionEnd,
+          p5: leaf.p5,
+          boundsPoints: [
+            leaf.l0Start,
+            firstEnd,
+            r5Guide,
+            arc2Start,
+            arc2Via,
+            arc2End,
+            limitJoin,
+            lowerCirclePoint(leaf.dMaxCircle.center, dMaxLimitRadius),
+            lowerCirclePoint(leaf.dMinCircle.center, dMinLimitRadius),
+            dMinExit,
+            r3Guide,
+            p5ExtensionEnd,
+            leaf.p5
+          ]
+        };
+      }
+
+      function drawLeafProfileOutline(view, model, leaf) {
+        const outline = buildLeafProfileOutline(model, leaf);
+        if (!outline) return;
+        const path = leafProfilePathPoints(leaf, outline);
+        if (path) drawPolyline(view, path.outerPoints, LEAF_PROFILE_COLOR, 2);
+      }
+
+      function apertureLeafOverlayPoints(model, leaf) {
+        const outline = buildLeafProfileOutline(model, leaf);
+        const profilePath = leafProfilePathPoints(leaf, outline);
+        const slotPath = buildSlotLinePoints(leaf);
+        if (!profilePath || slotPath.length === 0) return [];
+        const driveLaw = rotorOnSlotAtTheta(model, leaf, state.theta_sr);
+        const points = [];
+        for (let index = 0; index < model.count; index += 1) {
+          const transform = leafBodyTransform(model, leaf, index, driveLaw);
+          points.push(...transformedLeafBodyPoints(profilePath.closedPoints, transform));
+          points.push(...transformedLeafBodyPoints(slotPath, transform));
+        }
+        return points;
+      }
+
+      function drawLeafOverlaysOnAperture(view, model, leaf) {
+        const outline = buildLeafProfileOutline(model, leaf);
+        const profilePath = leafProfilePathPoints(leaf, outline);
+        const slotPath = buildSlotLinePoints(leaf);
+        if (!profilePath || slotPath.length === 0) return;
+        const driveLaw = rotorOnSlotAtTheta(model, leaf, state.theta_sr);
+        for (let index = 0; index < model.count; index += 1) {
+          const transform = leafBodyTransform(model, leaf, index, driveLaw);
+          const colors = LEAF_GROUP_COLORS[index % LEAF_GROUP_COLORS.length];
+          const profile = transformedLeafBodyPoints(profilePath.closedPoints, transform);
+          const slot = transformedLeafBodyPoints(slotPath, transform);
+          drawClosedPolyline(view, profile, colors.stroke, colors.fill, 1.2);
+          drawPolyline(view, slot, colors.stroke, 1.4);
+        }
+      }
+
+      function apertureBounds(model, leaf = null) {
         const extent = Math.max(state.Rs, state.Rr) + Math.max(1.2, state.Pin_Size * 2);
         const points = [
           { x: -extent, y: -extent },
@@ -1033,6 +1459,7 @@
           ...model.stator,
           ...model.rotor
         ];
+        if (leaf) points.push(...apertureLeafOverlayPoints(model, leaf));
         let xMin = Infinity;
         let xMax = -Infinity;
         let yMin = Infinity;
@@ -1047,13 +1474,14 @@
         return { xMin: xMin - pad, xMax: xMax + pad, yMin: yMin - pad, yMax: yMax + pad };
       }
 
-      function drawVariableAperture(model) {
-        const bounds = zoomedBounds(apertureBounds(model), "aperture");
+      function drawVariableAperture(model, leafGeometry = null) {
+        const bounds = zoomedBounds(apertureBounds(model, leafGeometry), "aperture");
         const view = setupCanvas(apertureCanvas, bounds);
         renderState.aperture.scale = view.scale;
         drawGrid(view, bounds);
         drawCircle(view, { x: 0, y: 0 }, state.Rs, "#0f766e", "transparent", 1);
         drawCircle(view, { x: 0, y: 0 }, state.Rr, "#2563eb", "transparent", 1);
+        if (leafGeometry) drawLeafOverlaysOnAperture(view, model, leafGeometry);
         const pinRadius = state.Pin_Size / 2;
         drawPinSet(view, model.stator, "#0f766e", "rgba(15, 118, 110, 0.10)", pinRadius, "S", model.reference.index);
         drawPinSet(view, model.rotor, "#2563eb", "rgba(37, 99, 235, 0.10)", pinRadius, "R", model.reference.index);
@@ -1123,6 +1551,7 @@
         if (leaf.dMaxCircle) {
           drawLeafLimitCircle(view, leaf.dMaxCircle.center, state.Leaf_max);
         }
+        drawLeafProfileOutline(view, model, leaf);
         if (leaf.dMinCircle) {
           drawComputedDiameterCircle(view, leaf.dMinCircle, "D_min");
         }
@@ -1897,6 +2326,48 @@
         return add(line.point, scaleVector(line.direction, dot(delta, line.direction)));
       }
 
+      function lineLineIntersection(lineA, lineB) {
+        const denom = cross(lineA.direction, lineB.direction);
+        if (Math.abs(denom) < 1e-9) return null;
+        const delta = subtract(lineB.point, lineA.point);
+        const t = cross(delta, lineB.direction) / denom;
+        return add(lineA.point, scaleVector(lineA.direction, t));
+      }
+
+      function lineCircleIntersections(line, center, radius) {
+        const origin = subtract(line.point, center);
+        const b = 2 * dot(origin, line.direction);
+        const c = dot(origin, origin) - radius * radius;
+        const discriminant = b * b - 4 * c;
+        if (discriminant < -1e-9) return [];
+        const root = Math.sqrt(Math.max(0, discriminant));
+        const values = [(-b - root) / 2, (-b + root) / 2];
+        return values.map((t) => ({
+          t,
+          point: add(line.point, scaleVector(line.direction, t))
+        }));
+      }
+
+      function circleCircleIntersections(centerA, radiusA, centerB, radiusB) {
+        const delta = subtract(centerB, centerA);
+        const d = Math.hypot(delta.x, delta.y);
+        if (d < 1e-9 || d > radiusA + radiusB + 1e-9 || d < Math.abs(radiusA - radiusB) - 1e-9) {
+          return [];
+        }
+        const a = (radiusA * radiusA - radiusB * radiusB + d * d) / (2 * d);
+        const hSquared = radiusA * radiusA - a * a;
+        if (hSquared < -1e-9) return [];
+        const h = Math.sqrt(Math.max(0, hSquared));
+        const unit = { x: delta.x / d, y: delta.y / d };
+        const base = add(centerA, scaleVector(unit, a));
+        const normal = { x: -unit.y, y: unit.x };
+        if (h < 1e-9) return [base];
+        return [
+          add(base, scaleVector(normal, h)),
+          add(base, scaleVector(normal, -h))
+        ];
+      }
+
       function circleLineIntersectionCenter(circleCenter, circleRadius, lineNormal, lineOffset, preferredPoint) {
         const signedDistance = lineOffset - dot(lineNormal, circleCenter);
         const remaining = circleRadius * circleRadius - signedDistance * signedDistance;
@@ -1942,6 +2413,8 @@
         }
         if (model) {
           points.push(...dCenteredLeafPinPoints(model, leaf));
+          const outline = buildLeafProfileOutline(model, leaf);
+          if (outline) points.push(...outline.boundsPoints);
         }
         let xMin = Infinity;
         let xMax = -Infinity;
@@ -1965,6 +2438,181 @@
 
       function distance(a, b) {
         return Math.hypot(a.x - b.x, a.y - b.y);
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function angleBetweenVectors(a, b) {
+        const denom = Math.hypot(a.x, a.y) * Math.hypot(b.x, b.y);
+        if (denom < 1e-9) return null;
+        return Math.acos(clamp(dot(a, b) / denom, -1, 1)) / DEG;
+      }
+
+      function signedClockwiseAngle(referenceVector, targetVector) {
+        const denom = Math.hypot(referenceVector.x, referenceVector.y) * Math.hypot(targetVector.x, targetVector.y);
+        if (denom < 1e-9) return null;
+        const ccwAngle = Math.atan2(cross(referenceVector, targetVector), dot(referenceVector, targetVector)) / DEG;
+        return -ccwAngle;
+      }
+
+      function alphaFromSlotCross(dCenter, statorPin, arc) {
+        const centerStatorLine = lineFromPoints(dCenter, statorPin);
+        const crossings = lineCircleIntersections(centerStatorLine, arc.center, arc.radius);
+        if (crossings.length === 0) return null;
+        const pCross = crossings.reduce((best, item) => (
+          distance(item.point, dCenter) > distance(best.point, dCenter) ? item : best
+        ), crossings[0]).point;
+        const alphaRef = signedClockwiseAngle(
+          subtract(dCenter, pCross),
+          subtract(arc.center, pCross)
+        );
+        if (!Number.isFinite(alphaRef)) return null;
+        return {
+          pArc: arc.center,
+          pCross,
+          alphaRef,
+          alpha: 90 + alphaRef
+        };
+      }
+
+      function unwrapAngleNear(angle, reference) {
+        let result = angle;
+        while (result - reference > 180) result -= 360;
+        while (result - reference < -180) result += 360;
+        return result;
+      }
+
+      function referenceThetaValues(leaf) {
+        const start = leaf.slThetas?.sl0 ?? state.SL0_theta;
+        const end = leaf.slThetas?.sl4 ?? state.SL4_theta;
+        const values = [];
+        if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return values;
+        for (let theta = start; theta <= end + 1e-9; theta += 1) {
+          values.push(Number(theta.toFixed(10)));
+        }
+        if (values.length === 0 || Math.abs(values[values.length - 1] - end) > 1e-9) {
+          values.push(end);
+        }
+        return values;
+      }
+
+      function slotArcForTheta(leaf, theta) {
+        if (!leaf.slArcData?.arc1 || !leaf.slArcData?.arc2 || !leaf.slThetas) return null;
+        return theta <= leaf.slThetas.sl2
+          ? { arc: leaf.slArcData.arc1, startIndex: 0, endIndex: 2 }
+          : { arc: leaf.slArcData.arc2, startIndex: 2, endIndex: 4 };
+      }
+
+      function centerAngleAtTheta(leaf, theta) {
+        const points = leaf.slPoints;
+        if (!points || points.length < 5) return null;
+        const states = points.map((item) => ({
+          theta: item.theta,
+          angle: angleOfVector(subtract(item.center, item.statorPoint))
+        }));
+        for (let index = 0; index < states.length - 1; index += 1) {
+          const a = states[index];
+          const b = states[index + 1];
+          if (theta >= a.theta - 1e-9 && theta <= b.theta + 1e-9) {
+            const nextAngle = unwrapAngleNear(b.angle, a.angle);
+            const ratio = (theta - a.theta) / Math.max(1e-9, b.theta - a.theta);
+            return a.angle + (nextAngle - a.angle) * ratio;
+          }
+        }
+        return states[0].angle;
+      }
+
+      function rotorOnSlotAtTheta(model, leaf, theta) {
+        const arcInfo = slotArcForTheta(leaf, theta);
+        const seedAngle = centerAngleAtTheta(leaf, theta);
+        if (!arcInfo || !Number.isFinite(seedAngle)) return null;
+        const statorPin = model.reference;
+        const evaluate = (centerAngle) => {
+          const center = pointOnCircle(statorPin, state.Rs, centerAngle);
+          const baseAngle = angleFromCenterToPoint(center, statorPin);
+          const rotor = pinFromCenter(center, state.Rr, baseAngle + theta);
+          return {
+            centerAngle,
+            center,
+            rotor,
+            residual: Math.abs(distance(rotor, arcInfo.arc.center) - arcInfo.arc.radius)
+          };
+        };
+        let best = evaluate(seedAngle);
+        const accept = (angle) => {
+          const candidate = evaluate(angle);
+          if (candidate.residual < best.residual) best = candidate;
+        };
+        for (let angle = seedAngle - 10; angle <= seedAngle + 10; angle += 1) accept(angle);
+        let step = 0.5;
+        while (step > 0.001) {
+          const previous = best;
+          accept(best.centerAngle - step);
+          accept(best.centerAngle + step);
+          if (best === previous) step /= 2;
+        }
+        const radial = normalizeVector(subtract(best.rotor, best.center));
+        const tangentVector = normalizeVector({ x: -radial.y, y: radial.x });
+        const arcNormalVector = normalizeVector(subtract(best.rotor, arcInfo.arc.center));
+        const pressure = orientPositivePressureVector(arcNormalVector, tangentVector);
+        const beta = angleBetweenVectors(subtract(best.center, statorPin), subtract(best.rotor, statorPin));
+        const pGap = distance(statorPin, best.rotor);
+        const rh = distance(arcInfo.arc.center, statorPin);
+        const rt = distance(arcInfo.arc.center, best.rotor);
+        const thetaTh = angleBetweenVectors(subtract(statorPin, arcInfo.arc.center), subtract(best.rotor, arcInfo.arc.center));
+        const s = Number.isFinite(thetaTh) ? rh * Math.sin(rad(thetaTh)) : null;
+        const d = Number.isFinite(s) ? Math.sqrt(Math.max(0, pGap * pGap - s * s)) : null;
+        const alphaData = alphaFromSlotCross(best.center, statorPin, arcInfo.arc);
+        const epsilon = pressure.angle;
+        const cosEpsilon = Math.cos(rad(epsilon));
+        return {
+          theta,
+          center: best.center,
+          rotor: best.rotor,
+          arc: arcInfo.arc,
+          arcLabel: theta <= leaf.slThetas.sl2 ? "Arc1" : "Arc2",
+          beta,
+          betaTheta: theta !== 0 && Number.isFinite(beta) ? beta / theta : null,
+          radiusRatio: state.Rs / state.Rr,
+          alpha: alphaData?.alpha ?? null,
+          alphaRef: alphaData?.alphaRef ?? null,
+          pArc: alphaData?.pArc ?? null,
+          pCross: alphaData?.pCross ?? null,
+          d,
+          p: pGap,
+          epsilon,
+          fr: 100 * cosEpsilon / state.Rr,
+          toutTin: Number.isFinite(s) ? s * cosEpsilon / state.Rr : null,
+          rh,
+          rt,
+          thetaTh,
+          s,
+          residual: best.residual
+        };
+      }
+
+      function updateReferenceRows(model, leaf) {
+        const rows = document.getElementById("referenceRows");
+        rows.innerHTML = "";
+        for (const theta of referenceThetaValues(leaf)) {
+          const law = rotorOnSlotAtTheta(model, leaf, theta);
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${fmt(theta, 3)}</td>
+            <td>${fmt(law?.beta, 4)}</td>
+            <td>${fmt(law?.betaTheta, 4)}</td>
+            <td>${fmt(law?.radiusRatio, 4)}</td>
+            <td>${fmt(law?.alpha, 4)}</td>
+            <td>${fmt(law?.d, 4)}</td>
+            <td>${fmt(law?.p, 4)}</td>
+            <td>${fmt(law?.epsilon, 4)}</td>
+            <td>${fmt(law?.fr, 4)}</td>
+            <td>${fmt(law?.toutTin, 4)}</td>
+          `;
+          rows.appendChild(tr);
+        }
       }
 
       function thetaOrderStatus(leaf) {
@@ -2047,9 +2695,10 @@
         const r = model.referenceRotor;
         const leaf = leafGeometry ?? buildLeafGeometry(s);
         updateConstraintStatuses(leaf);
+        updateReferenceRows(model, leaf);
         document.getElementById("apertureTag").textContent = `${model.count} pins / step ${fmt(model.step, 2)}deg`;
         document.getElementById("leafTag").textContent = `S${s.index} -> R${r.index}`;
-        document.getElementById("coordinateTag").textContent = `pin gap ${fmt(distance(s, r), 3)}mm`;
+        document.getElementById("coordinateTag").textContent = `pin gap ${fmt(distance(s, r), 3)}mm / laws ${referenceThetaValues(leaf).length}`;
         const rows = document.getElementById("coordinateRows");
         rows.innerHTML = "";
         const items = [
@@ -2223,7 +2872,7 @@
         const model = buildPins();
         updateLeafPinControls(model);
         const leaf = getLeafGeometry(model.reference);
-        drawVariableAperture(model);
+        drawVariableAperture(model, leaf);
         drawLeaf(model, leaf);
         updateText(model, leaf);
       }
@@ -2412,6 +3061,22 @@
         }
       }
 
+      function setupDataTabs() {
+        const buttons = Array.from(document.querySelectorAll("[data-data-page]"));
+        const panels = Array.from(document.querySelectorAll("[data-page-panel]"));
+        for (const button of buttons) {
+          button.addEventListener("click", () => {
+            const page = button.dataset.dataPage;
+            for (const item of buttons) {
+              item.classList.toggle("active", item.dataset.dataPage === page);
+            }
+            for (const panel of panels) {
+              panel.hidden = panel.dataset.pagePanel !== page;
+            }
+          });
+        }
+      }
+
       function setupZoomControls() {
         document.querySelectorAll("[data-zoom-target]").forEach((button) => {
           button.addEventListener("click", () => {
@@ -2490,6 +3155,7 @@
 
       buildControls();
       buildConstraintControls();
+      setupDataTabs();
       setupZoomControls();
       setupDragControls();
       document.getElementById("resetButton").addEventListener("click", resetDefaults);

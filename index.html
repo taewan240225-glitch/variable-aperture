@@ -1313,8 +1313,14 @@
           leaf.dMinCircle.center,
           leaf.dMaxCircle.radius
         ).map((point) => {
+          const firstGuideLine = lineFromPoints(leaf.l0Start, r5Guide);
           const line = { point, direction: l0Direction };
-          const firstEnd = projectPointToLine(r5Guide, line);
+          const firstEnd = lineLineIntersection(firstGuideLine, line)
+            ?? projectPointToLine(r5Guide, line);
+          const guideT = dot(subtract(r5Guide, firstGuideLine.point), firstGuideLine.direction);
+          const endT = dot(subtract(firstEnd, firstGuideLine.point), firstGuideLine.direction);
+          const guideOnSegment = guideT >= Math.min(0, endT) - 1e-6
+            && guideT <= Math.max(0, endT) + 1e-6;
           const clockwise = clockwiseForArcVia(arc2.center, point, arc2End, arc2Via);
           const sweep = arcSweepMagnitude(arc2.center, point, arc2End, clockwise);
           return {
@@ -1322,14 +1328,14 @@
             firstEnd,
             clockwise,
             sweep,
-            guideDistance: distance(firstEnd, r5Guide),
+            guideOnSegment,
             firstLength: distance(leaf.l0Start, firstEnd)
           };
         });
         const arc2StartChoice = choosePoint(arc2StartCandidates, (candidate) => (
           (candidate.sweep > Math.PI ? 1000 : 0) +
+          (candidate.guideOnSegment ? 0 : 100) +
           candidate.sweep +
-          candidate.guideDistance * 2 +
           candidate.firstLength * 0.05
         ));
         const arc2Start = arc2StartChoice?.point ?? r5Guide;

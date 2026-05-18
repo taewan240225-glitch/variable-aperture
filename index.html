@@ -1288,7 +1288,8 @@
         }
 
         const l0Direction = normalizeVector(subtract(leaf.p1, leaf.l0Start));
-        const firstDirection = normalizeVector(rotateVector(l0Direction, -LEAF_OUTLINE_FIRST_ANGLE));
+        const l0OutwardDirection = scaleVector(l0Direction, -1);
+        const firstDirection = normalizeVector(rotateVector(l0OutwardDirection, LEAF_OUTLINE_FIRST_ANGLE));
         const connectorGuide = { x: model.reference.x - 1, y: model.reference.y };
         const firstEnd = add(leaf.l0Start, scaleVector(firstDirection, LEAF_OUTLINE_FIRST_LENGTH));
 

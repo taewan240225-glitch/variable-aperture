@@ -647,7 +647,7 @@
         {
           key: "pressureTarget",
           label: "Pressure angle target",
-          note: "SL0, SL2, and SL4 epsilon are solved toward Pressure angle.",
+          note: "SL0, SL2, and SL4 epsilon are solved toward Pressure angle before the SL4 theta seed.",
           enabled: true,
           blocking: false
         }
@@ -2036,13 +2036,39 @@
         };
       }
 
+      function thetaSolveBounds(seeds) {
+        const seedSpan = Math.max(5, seeds.sl4 - seeds.sl0);
+        const min = seeds.sl1 + 0.05;
+        const max = Math.min(
+          seeds.sl0 + 90,
+          Math.max(seeds.sl4 + 20, seeds.sl0 + seedSpan * 2 + 5)
+        );
+        return { min, max };
+      }
+
+      function solvedSlThetas(seeds, thetaSrRef1, thetaSrRef2) {
+        return {
+          sl0: seeds.sl0,
+          sl1: seeds.sl1,
+          sl2: thetaSrRef1,
+          sl3: thetaSrRef2,
+          sl4: thetaSrRef2 + 0.7
+        };
+      }
+
+      function thetaCandidateValid(seeds, thetaSrRef1, thetaSrRef2, bounds) {
+        return seeds.sl0 < seeds.sl1
+          && thetaSrRef1 > seeds.sl1 + 0.05
+          && thetaSrRef2 > thetaSrRef1 + 0.05
+          && thetaSrRef2 + 0.7 <= bounds.max + 0.7;
+      }
+
       function solveSlCenters(baseCenters, l1InfiniteLine, preferredSl0Center, preferredSl4Center, p1, p2, p3, p4) {
         const seeds = interpolatedSlThetas();
-        const lower = seeds.sl1 + 0.05;
-        const upper = seeds.sl3 - 0.05;
+        const bounds = thetaSolveBounds(seeds);
         let best = null;
-        const accept = (sl0Angle, sl4Angle, thetaSrRef1) => {
-          if (thetaSrRef1 <= lower || thetaSrRef1 >= upper) return;
+        const accept = (sl0Angle, sl4Angle, thetaSrRef1, thetaSrRef2) => {
+          if (!thetaCandidateValid(seeds, thetaSrRef1, thetaSrRef2, bounds)) return;
           const candidate = scoreSlCenters(
             baseCenters,
             l1InfiniteLine,
@@ -2055,6 +2081,7 @@
             sl0Angle,
             sl4Angle,
             thetaSrRef1,
+            thetaSrRef2,
             seeds
           );
           if (!best || candidate.objective < best.objective) best = candidate;
@@ -2062,21 +2089,35 @@
 
         const preferredSl0Angle = angleOfVector(subtract(preferredSl0Center, baseCenters.statorPin));
         const preferredSl4Angle = angleOfVector(subtract(preferredSl4Center, baseCenters.statorPin));
-        accept(preferredSl0Angle, preferredSl4Angle, seeds.sl2);
+        accept(preferredSl0Angle, preferredSl4Angle, seeds.sl2, seeds.sl3);
 
-        for (let d0 = -8; d0 <= 8; d0 += 1) {
-          for (let d4 = -8; d4 <= 8; d4 += 1) {
-            for (let thetaSrRef1 = lower; thetaSrRef1 <= upper; thetaSrRef1 += 0.5) {
-              accept(preferredSl0Angle + d0, preferredSl4Angle + d4, thetaSrRef1);
+        const coarseDeltas = constraintEnabled("pressureTarget")
+          ? [-180, -135, -90, -45, 0, 45, 90, 135]
+          : [-8, -4, 0, 4, 8];
+        const coarseThetaStep = constraintEnabled("pressureTarget") ? 2 : 2;
+        for (const d0 of coarseDeltas) {
+          for (const d4 of coarseDeltas) {
+            for (let thetaSrRef2 = bounds.min + 0.6; thetaSrRef2 <= bounds.max; thetaSrRef2 += coarseThetaStep) {
+              for (let thetaSrRef1 = bounds.min; thetaSrRef1 <= thetaSrRef2 - 0.05; thetaSrRef1 += coarseThetaStep) {
+                accept(preferredSl0Angle + d0, preferredSl4Angle + d4, thetaSrRef1, thetaSrRef2);
+              }
             }
           }
         }
 
         if (constraintEnabled("pressureTarget")) {
-          for (let d0 = -3; d0 <= 3; d0 += 0.5) {
-            for (let d4 = -3; d4 <= 3; d4 += 0.5) {
-              for (let thetaSrRef1 = lower; thetaSrRef1 <= upper; thetaSrRef1 += 0.5) {
-                accept(preferredSl0Angle + d0, preferredSl4Angle + d4, thetaSrRef1);
+          const focusedSeeds = [
+            { theta2: seeds.sl2, theta3: seeds.sl3 },
+            { theta2: best?.thetas?.sl2 ?? seeds.sl2, theta3: best?.thetas?.sl3 ?? seeds.sl3 }
+          ];
+          for (const focused of focusedSeeds) {
+            for (let d0 = -8; d0 <= 8; d0 += 1) {
+              for (let d4 = -8; d4 <= 8; d4 += 1) {
+                for (let thetaSrRef2 = focused.theta3 - 4; thetaSrRef2 <= focused.theta3 + 4; thetaSrRef2 += 0.5) {
+                  for (let thetaSrRef1 = focused.theta2 - 4; thetaSrRef1 <= focused.theta2 + 4; thetaSrRef1 += 0.5) {
+                    accept(preferredSl0Angle + d0, preferredSl4Angle + d4, thetaSrRef1, thetaSrRef2);
+                  }
+                }
               }
             }
           }
@@ -2085,8 +2126,10 @@
         if (!best || best.objective >= HARD_CONSTRAINT_PENALTY) {
           for (let sl0Angle = 0; sl0Angle < 360; sl0Angle += 18) {
             for (let sl4Angle = 0; sl4Angle < 360; sl4Angle += 18) {
-              for (let thetaSrRef1 = lower; thetaSrRef1 <= upper; thetaSrRef1 += 1) {
-                accept(sl0Angle, sl4Angle, thetaSrRef1);
+              for (let thetaSrRef2 = bounds.min + 0.6; thetaSrRef2 <= bounds.max; thetaSrRef2 += 2) {
+                for (let thetaSrRef1 = bounds.min; thetaSrRef1 <= thetaSrRef2 - 0.05; thetaSrRef1 += 2) {
+                  accept(sl0Angle, sl4Angle, thetaSrRef1, thetaSrRef2);
+                }
               }
             }
           }
@@ -2095,21 +2138,25 @@
         let sl0Angle = best.sl0Angle;
         let sl4Angle = best.sl4Angle;
         let thetaSrRef1 = best.thetas.sl2;
+        let thetaSrRef2 = best.thetas.sl3;
         let angleStep = 6;
         let thetaStep = 0.6;
         while (angleStep > 0.02 || thetaStep > 0.002) {
           let improved = false;
           for (const d0 of [-angleStep, 0, angleStep]) {
             for (const d4 of [-angleStep, 0, angleStep]) {
-              for (const dt of [-thetaStep, 0, thetaStep]) {
-                if (d0 === 0 && d4 === 0 && dt === 0) continue;
-                const previous = best;
-                accept(sl0Angle + d0, sl4Angle + d4, thetaSrRef1 + dt);
-                if (best !== previous) {
-                  sl0Angle = best.sl0Angle;
-                  sl4Angle = best.sl4Angle;
-                  thetaSrRef1 = best.thetas.sl2;
-                  improved = true;
+              for (const dt2 of [-thetaStep, 0, thetaStep]) {
+                for (const dt3 of [-thetaStep, 0, thetaStep]) {
+                  if (d0 === 0 && d4 === 0 && dt2 === 0 && dt3 === 0) continue;
+                  const previous = best;
+                  accept(sl0Angle + d0, sl4Angle + d4, thetaSrRef1 + dt2, thetaSrRef2 + dt3);
+                  if (best !== previous) {
+                    sl0Angle = best.sl0Angle;
+                    sl4Angle = best.sl4Angle;
+                    thetaSrRef1 = best.thetas.sl2;
+                    thetaSrRef2 = best.thetas.sl3;
+                    improved = true;
+                  }
                 }
               }
             }
@@ -2122,19 +2169,13 @@
         return { sl0Center: best.sl0Center, sl4Center: best.sl4Center, solved: best.solved };
       }
 
-      function scoreSlCenters(baseCenters, l1InfiniteLine, preferredSl0Center, preferredSl4Center, p1, p2, p3, p4, sl0Angle, sl4Angle, thetaSrRef1, seeds) {
+      function scoreSlCenters(baseCenters, l1InfiniteLine, preferredSl0Center, preferredSl4Center, p1, p2, p3, p4, sl0Angle, sl4Angle, thetaSrRef1, thetaSrRef2, seeds) {
         const centers = {
           ...baseCenters,
           sl0Center: pointOnCircle(baseCenters.statorPin, state.Rs, sl0Angle),
           sl4Center: pointOnCircle(baseCenters.statorPin, state.Rs, sl4Angle)
         };
-        const thetas = {
-          sl0: seeds.sl0,
-          sl1: seeds.sl1,
-          sl2: thetaSrRef1,
-          sl3: seeds.sl3,
-          sl4: seeds.sl4
-        };
+        const thetas = solvedSlThetas(seeds, thetaSrRef1, thetaSrRef2);
         const dMinDiameter = distance(
           centers.sl0Center,
           projectPointToLine(centers.sl0Center, l1InfiniteLine)
@@ -2169,13 +2210,14 @@
         const dMinLeftArcPenalty = activePenalty("dMinLeftArcTangent", dMinLeftArcTangent.valid ? 0 : HARD_CONSTRAINT_PENALTY + dMinLeftArcTangent.penalty);
         const pointOrderPenalty = activePenalty("pointXOrder", pointOrder.valid ? 0 : HARD_CONSTRAINT_PENALTY + Math.abs(pointOrder.minGap ?? 1) * 1000);
         const pressureRangePenaltyValue = activePenalty("pressureRange", pressureRange?.valid ? 0 : HARD_CONSTRAINT_PENALTY + pressureRangePenalty(slPoints) * 1000);
-        const pressureTargetPenalty = activePenalty("pressureTarget", pressureTargets ? pressureTargets.sumSquaredError * 1000 : 100000);
+        const pressureTargetPenalty = activePenalty("pressureTarget", pressureTargets ? pressureTargets.sumSquaredError * 100000 : HARD_CONSTRAINT_PENALTY);
         const residualPenalty = activePenalty("arcTangency", residual <= ARC_TANGENCY_TOLERANCE
           ? residual * residual * 10000
           : HARD_CONSTRAINT_PENALTY + (residual - ARC_TANGENCY_TOLERANCE) * 1000000);
         const preferencePenalty =
           distance(centers.sl0Center, preferredSl0Center) ** 2 * 20 +
-          distance(centers.sl4Center, preferredSl4Center) ** 2 * 20;
+          distance(centers.sl4Center, preferredSl4Center) ** 2 * 20 +
+          (thetas.sl4 - seeds.sl4) ** 2 * (constraintEnabled("pressureTarget") ? 0.02 : 200);
         const solved = {
           theta_sr_ref1: thetas.sl2,
           theta_sr_ref2: thetas.sl3,
@@ -2546,30 +2588,18 @@
         return Math.acos(clamp(dot(a, b) / denom, -1, 1)) / DEG;
       }
 
-      function signedClockwiseAngle(referenceVector, targetVector) {
-        const denom = Math.hypot(referenceVector.x, referenceVector.y) * Math.hypot(targetVector.x, targetVector.y);
-        if (denom < 1e-9) return null;
-        const ccwAngle = Math.atan2(cross(referenceVector, targetVector), dot(referenceVector, targetVector)) / DEG;
-        return -ccwAngle;
+      function vertexAngle(a, vertex, b) {
+        return angleBetweenVectors(subtract(a, vertex), subtract(b, vertex));
       }
 
-      function alphaFromSlotCross(dCenter, statorPin, arc) {
-        const centerStatorLine = lineFromPoints(dCenter, statorPin);
-        const crossings = lineCircleIntersections(centerStatorLine, arc.center, arc.radius);
-        if (crossings.length === 0) return null;
-        const pCross = crossings.reduce((best, item) => (
-          distance(item.point, dCenter) > distance(best.point, dCenter) ? item : best
-        ), crossings[0]).point;
-        const alphaRef = signedClockwiseAngle(
-          subtract(dCenter, pCross),
-          subtract(arc.center, pCross)
-        );
-        if (!Number.isFinite(alphaRef)) return null;
+      function alphaFromStatorP1Reference(dCenter, dMinCenter, statorPin, p1) {
+        const currentAngle = vertexAngle(dCenter, statorPin, p1);
+        const dMinAngle = vertexAngle(dMinCenter, statorPin, p1);
+        if (!Number.isFinite(currentAngle) || !Number.isFinite(dMinAngle)) return null;
         return {
-          pArc: arc.center,
-          pCross,
-          alphaRef,
-          alpha: 90 + alphaRef
+          alpha: currentAngle - dMinAngle,
+          currentAngle,
+          dMinAngle
         };
       }
 
@@ -2660,7 +2690,10 @@
         const thetaTh = angleBetweenVectors(subtract(statorPin, arcInfo.arc.center), subtract(best.rotor, arcInfo.arc.center));
         const s = Number.isFinite(thetaTh) ? rh * Math.sin(rad(thetaTh)) : null;
         const d = Number.isFinite(s) ? Math.sqrt(Math.max(0, pGap * pGap - s * s)) : null;
-        const alphaData = alphaFromSlotCross(best.center, statorPin, arcInfo.arc);
+        const dMinCenter = leaf.slPoints?.[0]?.center ?? leaf.dMinCircle?.center ?? null;
+        const alphaData = dMinCenter
+          ? alphaFromStatorP1Reference(best.center, dMinCenter, statorPin, leaf.p1)
+          : null;
         const epsilon = pressure.angle;
         const cosEpsilon = Math.cos(rad(epsilon));
         return {
@@ -2673,9 +2706,8 @@
           betaTheta: theta !== 0 && Number.isFinite(beta) ? beta / theta : null,
           radiusRatio: state.Rs / state.Rr,
           alpha: alphaData?.alpha ?? null,
-          alphaRef: alphaData?.alphaRef ?? null,
-          pArc: alphaData?.pArc ?? null,
-          pCross: alphaData?.pCross ?? null,
+          alphaCurrent: alphaData?.currentAngle ?? null,
+          alphaDMin: alphaData?.dMinAngle ?? null,
           d,
           p: pGap,
           epsilon,

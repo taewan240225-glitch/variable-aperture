@@ -589,8 +589,6 @@
         { stroke: "#2563eb", fill: "rgba(37, 99, 235, 0.12)" },
         { stroke: "#c2410c", fill: "rgba(194, 65, 12, 0.12)" }
       ];
-      const LEAF_OUTLINE_FIRST_LENGTH = 2;
-      const LEAF_OUTLINE_FIRST_ANGLE = 75;
       const constraintDefs = [
         {
           key: "arcTangency",
@@ -1287,22 +1285,36 @@
           return null;
         }
 
+        const pinRadius = state.Pin_Size / 2;
+        const r5 = leafRotorPinForIndex(model, leaf, 5);
+        if (!r5) return null;
+
         const l0Direction = normalizeVector(subtract(leaf.p1, leaf.l0Start));
-        const l0OutwardDirection = scaleVector(l0Direction, -1);
-        const firstDirection = normalizeVector(rotateVector(l0OutwardDirection, LEAF_OUTLINE_FIRST_ANGLE));
+        const r5Guide = { x: r5.x - pinRadius - 0.5, y: r5.y };
         const connectorGuide = { x: model.reference.x - 1, y: model.reference.y };
-        const firstEnd = add(leaf.l0Start, scaleVector(firstDirection, LEAF_OUTLINE_FIRST_LENGTH));
 
         const arc2 = leaf.slArcData.arc2;
-        const pinRadius = state.Pin_Size / 2;
         const arc2OffsetRadius = arc2.radius + 1 + pinRadius;
-        const lineToArcOffset = { point: firstEnd, direction: l0Direction };
-        const lineArcHits = lineCircleIntersections(lineToArcOffset, arc2.center, arc2OffsetRadius);
-        const arc2StartHit = choosePoint(
-          lineArcHits.filter((hit) => hit.t >= 0),
-          (hit) => hit.t
-        ) ?? choosePoint(lineArcHits, (hit) => Math.abs(hit.t));
-        const arc2Start = arc2StartHit?.point ?? firstEnd;
+        const tangentNormal = { x: -l0Direction.y, y: l0Direction.x };
+        const tangentCandidates = [1, -1].map((side) => {
+          const tangentPoint = add(arc2.center, scaleVector(tangentNormal, side * arc2OffsetRadius));
+          const tangentLine = { point: tangentPoint, direction: l0Direction };
+          const firstEnd = projectPointToLine(r5Guide, tangentLine);
+          return {
+            side,
+            firstEnd,
+            arc2Start: tangentPoint,
+            tangentLine,
+            r5GuideDistance: distance(firstEnd, r5Guide),
+            tangentLength: distance(firstEnd, tangentPoint)
+          };
+        });
+        const tangentChoice = choosePoint(tangentCandidates, (candidate) => (
+          candidate.r5GuideDistance * 10 + candidate.tangentLength * 0.05
+        ));
+        const firstEnd = tangentChoice?.firstEnd ?? r5Guide;
+        const lineToArcOffset = tangentChoice?.tangentLine ?? { point: firstEnd, direction: l0Direction };
+        const arc2Start = tangentChoice?.arc2Start ?? firstEnd;
 
         const dMaxLimitRadius = state.Leaf_max / 2;
         const dMinLimitRadius = state.Leaf_max / 2;
@@ -1359,6 +1371,7 @@
         return {
           firstStart: leaf.l0Start,
           firstEnd,
+          r5Guide,
           lineToArcOffset,
           arc2Start,
           arc2Center: arc2.center,
@@ -1381,6 +1394,7 @@
           p5: leaf.p5,
           boundsPoints: [
             leaf.l0Start,
+            r5Guide,
             firstEnd,
             arc2Start,
             arc2Via,

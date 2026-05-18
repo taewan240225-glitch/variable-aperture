@@ -1295,10 +1295,7 @@
 
         const arc2 = leaf.slArcData.arc2;
         const arc2OffsetRadius = arc2.radius + 1 + pinRadius;
-        const firstEnd = r5Guide;
-        const lineToArcOffset = { point: firstEnd, direction: l0Direction };
         const arc2Via = pointOnCircleToward(arc2.center, arc2OffsetRadius, leaf.slPoints[3]?.point ?? leaf.slPoints[4]?.point);
-        const lineArcHits = lineCircleIntersections(lineToArcOffset, arc2.center, arc2OffsetRadius);
 
         const dMaxLimitRadius = state.Leaf_max / 2;
         const dMinLimitRadius = state.Leaf_max / 2;
@@ -1310,29 +1307,34 @@
         );
         const arc2End = choosePoint(dMaxLimitHits, (point) => distance(point, pointOnCircleToward(arc2.center, arc2OffsetRadius, leaf.slPoints[4].point)));
         if (!arc2End) return null;
-        const arc2StartHit = choosePoint(
-          lineArcHits.filter((hit) => hit.t >= -1e-6),
-          (hit) => {
-            const clockwise = clockwiseForArcVia(arc2.center, hit.point, arc2End, arc2Via);
-            const sweep = arcSweepMagnitude(arc2.center, hit.point, arc2End, clockwise);
-            return (sweep > Math.PI ? 100 : 0) + sweep + hit.t * 0.02;
-          }
-        ) ?? choosePoint(lineArcHits, (hit) => {
-          const clockwise = clockwiseForArcVia(arc2.center, hit.point, arc2End, arc2Via);
-          const sweep = arcSweepMagnitude(arc2.center, hit.point, arc2End, clockwise);
-          return (sweep > Math.PI ? 100 : 0) + sweep + Math.abs(hit.t) * 0.02;
+        const arc2StartCandidates = circleCircleIntersections(
+          arc2.center,
+          arc2OffsetRadius,
+          leaf.dMinCircle.center,
+          leaf.dMaxCircle.radius
+        ).map((point) => {
+          const line = { point, direction: l0Direction };
+          const firstEnd = projectPointToLine(r5Guide, line);
+          const clockwise = clockwiseForArcVia(arc2.center, point, arc2End, arc2Via);
+          const sweep = arcSweepMagnitude(arc2.center, point, arc2End, clockwise);
+          return {
+            point,
+            firstEnd,
+            clockwise,
+            sweep,
+            guideDistance: distance(firstEnd, r5Guide),
+            firstLength: distance(leaf.l0Start, firstEnd)
+          };
         });
-        const arc2Start = arc2StartHit?.point ?? firstEnd;
-        const arc2StartT = arc2StartHit?.t ?? 0;
-        const dMinDMaxHits = lineCircleIntersections(lineToArcOffset, leaf.dMinCircle.center, leaf.dMaxCircle.radius);
-        const lineExtensionHit = choosePoint(
-          dMinDMaxHits.filter((hit) => hit.t >= arc2StartT - 1e-6),
-          (hit) => hit.t
-        ) ?? choosePoint(
-          dMinDMaxHits.filter((hit) => hit.t >= -1e-6),
-          (hit) => hit.t
-        );
-        const lineExtensionEnd = lineExtensionHit?.point ?? arc2Start;
+        const arc2StartChoice = choosePoint(arc2StartCandidates, (candidate) => (
+          (candidate.sweep > Math.PI ? 1000 : 0) +
+          candidate.sweep +
+          candidate.guideDistance * 2 +
+          candidate.firstLength * 0.05
+        ));
+        const arc2Start = arc2StartChoice?.point ?? r5Guide;
+        const firstEnd = arc2StartChoice?.firstEnd ?? r5Guide;
+        const lineToArcOffset = { point: firstEnd, direction: l0Direction };
 
         const limitIntersections = circleCircleIntersections(
           leaf.dMaxCircle.center,
@@ -1379,7 +1381,6 @@
           firstEnd,
           r5Guide,
           lineToArcOffset,
-          lineExtensionEnd,
           arc2Start,
           arc2Center: arc2.center,
           arc2Radius: arc2OffsetRadius,
@@ -1403,7 +1404,6 @@
             leaf.l0Start,
             r5Guide,
             firstEnd,
-            lineExtensionEnd,
             arc2Start,
             arc2Via,
             arc2End,
@@ -1423,9 +1423,6 @@
         if (!outline) return;
         const path = leafProfilePathPoints(leaf, outline);
         if (path) drawPolyline(view, path.outerPoints, LEAF_PROFILE_COLOR, 2);
-        if (outline.lineExtensionEnd) {
-          drawLine(view, outline.firstEnd, outline.lineExtensionEnd, LEAF_PROFILE_COLOR, 2);
-        }
       }
 
       function apertureLeafOverlayPoints(model, leaf) {

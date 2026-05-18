@@ -568,13 +568,13 @@
         { key: "theta_sr", label: "theta_sr", unit: "deg", min: -180, max: 180, step: 0.1, value: 14.7 },
         { key: "SL0_theta", label: "SL0 theta", unit: "deg", min: -180, max: 180, step: 0.1, value: 14 },
         { key: "SL4_theta", label: "SL4 theta", unit: "deg", min: -180, max: 180, step: 0.1, value: 28 },
-        { key: "D_F1_47", label: "D_F1.47", unit: "mm dia", min: 0.1, max: 20, step: 0.01, value: 7.83 },
-        { key: "D_F1_7", label: "D_F1.7", unit: "mm dia", min: 0.1, max: 20, step: 0.01, value: 6.52 },
-        { key: "D_F4_0", label: "D_F4.0", unit: "mm dia", min: 0.1, max: 20, step: 0.01, value: 2.78 },
-        { key: "D_F6_0", label: "D_F6.0", unit: "mm dia", min: 0.1, max: 20, step: 0.01, value: 2.2 },
+        { key: "D_F1_47", label: "D_F1.47", unit: "mm dia", min: 0.1, max: 20, step: 0.001, value: 7.83 },
+        { key: "D_F1_7", label: "D_F1.7", unit: "mm dia", min: 0.1, max: 20, step: 0.001, value: 6.52 },
+        { key: "D_F4_0", label: "D_F4.0", unit: "mm dia", min: 0.1, max: 20, step: 0.001, value: 2.78 },
+        { key: "D_F6_0", label: "D_F6.0", unit: "mm dia", min: 0.1, max: 20, step: 0.001, value: 2.2 },
         { key: "Leaf_max", label: "Leaf_max", unit: "mm dia", min: 0.1, max: 40, step: 0.01, value: 16.5 },
-        { key: "theta_1", label: "theta_1", unit: "deg", min: -180, max: 180, step: 0.1, value: 20 },
-        { key: "theta_2", label: "theta_2", unit: "deg", min: -180, max: 180, step: 0.1, value: 30 },
+        { key: "theta_1", label: "theta_1", unit: "deg", min: -180, max: 180, step: 0.1, value: 35 },
+        { key: "theta_2", label: "theta_2", unit: "deg", min: -180, max: 180, step: 0.1, value: 27 },
         { key: "ex_line", label: "ex_line", unit: "mm", min: 0, max: 5, step: 0.01, value: 0.55 },
         { key: "Pressure_angle", label: "Pressure angle", unit: "deg", min: 0, max: 89, step: 0.1, value: 30 }
       ];
@@ -1285,36 +1285,20 @@
           return null;
         }
 
-        const pinRadius = state.Pin_Size / 2;
         const r5 = leafRotorPinForIndex(model, leaf, 5);
         if (!r5) return null;
 
+        const pinRadius = state.Pin_Size / 2;
         const l0Direction = normalizeVector(subtract(leaf.p1, leaf.l0Start));
-        const r5Guide = { x: r5.x - pinRadius - 0.5, y: r5.y };
+        const r5Guide = { x: r5.x - 1, y: r5.y };
         const connectorGuide = { x: model.reference.x - 1, y: model.reference.y };
 
         const arc2 = leaf.slArcData.arc2;
         const arc2OffsetRadius = arc2.radius + 1 + pinRadius;
-        const tangentNormal = { x: -l0Direction.y, y: l0Direction.x };
-        const tangentCandidates = [1, -1].map((side) => {
-          const tangentPoint = add(arc2.center, scaleVector(tangentNormal, side * arc2OffsetRadius));
-          const tangentLine = { point: tangentPoint, direction: l0Direction };
-          const firstEnd = projectPointToLine(r5Guide, tangentLine);
-          return {
-            side,
-            firstEnd,
-            arc2Start: tangentPoint,
-            tangentLine,
-            r5GuideDistance: distance(firstEnd, r5Guide),
-            tangentLength: distance(firstEnd, tangentPoint)
-          };
-        });
-        const tangentChoice = choosePoint(tangentCandidates, (candidate) => (
-          candidate.r5GuideDistance * 10 + candidate.tangentLength * 0.05
-        ));
-        const firstEnd = tangentChoice?.firstEnd ?? r5Guide;
-        const lineToArcOffset = tangentChoice?.tangentLine ?? { point: firstEnd, direction: l0Direction };
-        const arc2Start = tangentChoice?.arc2Start ?? firstEnd;
+        const firstEnd = r5Guide;
+        const lineToArcOffset = { point: firstEnd, direction: l0Direction };
+        const arc2Via = pointOnCircleToward(arc2.center, arc2OffsetRadius, leaf.slPoints[3]?.point ?? leaf.slPoints[4]?.point);
+        const lineArcHits = lineCircleIntersections(lineToArcOffset, arc2.center, arc2OffsetRadius);
 
         const dMaxLimitRadius = state.Leaf_max / 2;
         const dMinLimitRadius = state.Leaf_max / 2;
@@ -1324,9 +1308,21 @@
           leaf.dMaxCircle.center,
           dMaxLimitRadius
         );
-        const arc2Via = pointOnCircleToward(arc2.center, arc2OffsetRadius, leaf.slPoints[3]?.point ?? leaf.slPoints[4]?.point);
         const arc2End = choosePoint(dMaxLimitHits, (point) => distance(point, pointOnCircleToward(arc2.center, arc2OffsetRadius, leaf.slPoints[4].point)));
         if (!arc2End) return null;
+        const arc2StartHit = choosePoint(
+          lineArcHits.filter((hit) => hit.t >= -1e-6),
+          (hit) => {
+            const clockwise = clockwiseForArcVia(arc2.center, hit.point, arc2End, arc2Via);
+            const sweep = arcSweepMagnitude(arc2.center, hit.point, arc2End, clockwise);
+            return (sweep > Math.PI ? 100 : 0) + sweep + hit.t * 0.02;
+          }
+        ) ?? choosePoint(lineArcHits, (hit) => {
+          const clockwise = clockwiseForArcVia(arc2.center, hit.point, arc2End, arc2Via);
+          const sweep = arcSweepMagnitude(arc2.center, hit.point, arc2End, clockwise);
+          return (sweep > Math.PI ? 100 : 0) + sweep + Math.abs(hit.t) * 0.02;
+        });
+        const arc2Start = arc2StartHit?.point ?? firstEnd;
 
         const limitIntersections = circleCircleIntersections(
           leaf.dMaxCircle.center,

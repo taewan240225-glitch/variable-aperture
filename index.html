@@ -627,6 +627,12 @@
           enabled: true
         },
         {
+          key: "leafPinExclusion",
+          label: "No other pins inside leaf",
+          note: "The closed leaf profile may contain only the reference S/R pin pair.",
+          enabled: true
+        },
+        {
           key: "dMinLeftArcTangent",
           label: "D_min left line/arc tangent",
           note: "D_min must stay on the D_F6.0 side of L1, left of P1, and tangent to the D_F6.0 arc.",
@@ -1241,6 +1247,85 @@
         const arc1 = arcThroughPointsArray(leaf.slPoints[0].point, leaf.slPoints[1].point, leaf.slPoints[2].point);
         const arc2 = arcThroughPointsArray(leaf.slPoints[2].point, leaf.slPoints[3].point, leaf.slPoints[4].point);
         return [...arc1, ...arc2.slice(1)];
+      }
+
+      function pointInPolygon(point, polygon) {
+        if (!polygon || polygon.length < 3) return false;
+        let inside = false;
+        for (let index = 0, prev = polygon.length - 1; index < polygon.length; prev = index, index += 1) {
+          const a = polygon[index];
+          const b = polygon[prev];
+          const crosses = (a.y > point.y) !== (b.y > point.y);
+          if (!crosses) continue;
+          const denom = b.y - a.y;
+          if (Math.abs(denom) < 1e-12) continue;
+          const xAtY = ((b.x - a.x) * (point.y - a.y)) / denom + a.x;
+          if (point.x < xAtY) inside = !inside;
+        }
+        return inside;
+      }
+
+      function pointSegmentDistance(point, a, b) {
+        const ab = subtract(b, a);
+        const lengthSquared = dot(ab, ab);
+        if (lengthSquared < 1e-12) return distance(point, a);
+        const t = clamp(dot(subtract(point, a), ab) / lengthSquared, 0, 1);
+        return distance(point, add(a, scaleVector(ab, t)));
+      }
+
+      function pointPolylineDistance(point, points) {
+        if (!points || points.length === 0) return Infinity;
+        let minDistance = Infinity;
+        for (let index = 0; index < points.length; index += 1) {
+          const next = (index + 1) % points.length;
+          minDistance = Math.min(minDistance, pointSegmentDistance(point, points[index], points[next]));
+        }
+        return minDistance;
+      }
+
+      function leafPinExclusionStatus(model, leaf) {
+        const outline = buildLeafProfileOutline(model, leaf);
+        const profile = leafProfilePathPoints(leaf, outline);
+        if (!profile?.closedPoints?.length) {
+          return { valid: false, note: "Leaf profile unavailable" };
+        }
+        const pinRadius = state.Pin_Size / 2;
+        const states = dCenterStates(leaf);
+        const referenceIndex = model.reference.index;
+        const violations = [];
+        let minClearance = Infinity;
+        for (let index = 0; index < model.count; index += 1) {
+          if (index === referenceIndex) continue;
+          for (const dState of states) {
+            const pins = [
+              { label: `S${index}`, point: leafStatorPinAtD(model, dState.center, index) },
+              { label: `R${index}`, point: leafRotorPinAtD(model, dState.center, index, dState.theta) }
+            ];
+            for (const pin of pins) {
+              const edgeDistance = pointPolylineDistance(pin.point, profile.closedPoints);
+              const inside = pointInPolygon(pin.point, profile.closedPoints);
+              const clearance = inside ? -pinRadius : edgeDistance - pinRadius;
+              minClearance = Math.min(minClearance, clearance);
+              if (inside || edgeDistance <= pinRadius + 1e-6) {
+                violations.push({
+                  label: `${pin.label}@${dState.label}`,
+                  clearance,
+                  inside
+                });
+              }
+            }
+          }
+        }
+        if (violations.length === 0) {
+          return {
+            valid: true,
+            note: `Only S${referenceIndex}/R${referenceIndex} allowed inside, nearest clearance=${fmt(minClearance, 4)}mm`
+          };
+        }
+        return {
+          valid: false,
+          note: `${violations.length} conflict(s): ${violations.slice(0, 3).map((item) => item.label).join(", ")}`
+        };
       }
 
       function transformedLeafBodyPoints(points, transform) {
@@ -2641,7 +2726,7 @@
         };
       }
 
-      function constraintStatuses(leaf) {
+      function constraintStatuses(leaf, model = buildPins()) {
         const dMinDiameter = leaf.dMinCircle ? leaf.dMinCircle.radius * 2 : null;
         const residual = leaf.thetaSolveResidual;
         return {
@@ -2668,6 +2753,7 @@
             valid: leaf.diameterOrder?.valid === true,
             note: leaf.diameterOrder?.label ?? "Diameter order unavailable"
           },
+          leafPinExclusion: leafPinExclusionStatus(model, leaf),
           dMinLeftArcTangent: {
             valid: leaf.dMinLeftArcTangent?.valid === true,
             note: leaf.dMinLeftArcTangent?.label ?? "D_min line/arc tangency unavailable"
@@ -2687,8 +2773,8 @@
         };
       }
 
-      function updateConstraintStatuses(leaf) {
-        const statuses = constraintStatuses(leaf);
+      function updateConstraintStatuses(leaf, model) {
+        const statuses = constraintStatuses(leaf, model);
         for (const def of constraintDefs) {
           const status = statuses[def.key];
           const element = document.querySelector(`[data-constraint-status="${def.key}"]`);
@@ -2705,7 +2791,7 @@
         const s = model.reference;
         const r = model.referenceRotor;
         const leaf = leafGeometry ?? buildLeafGeometry(s);
-        updateConstraintStatuses(leaf);
+        updateConstraintStatuses(leaf, model);
         updateReferenceRows(model, leaf);
         document.getElementById("apertureTag").textContent = `${model.count} pins / step ${fmt(model.step, 2)}deg`;
         document.getElementById("leafTag").textContent = `S${s.index} -> R${r.index}`;
@@ -2923,7 +3009,7 @@
         try {
           const model = buildPins();
           const leaf = getLeafGeometry(model.reference);
-          const statuses = constraintStatuses(leaf);
+          const statuses = constraintStatuses(leaf, model);
           return constraintDefs.every((def) => def.blocking === false || !constraintEnabled(def.key) || statuses[def.key]?.valid === true);
         } catch (error) {
           return false;

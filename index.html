@@ -664,6 +664,7 @@
         leaf: { scale: 1 }
       };
       const leafGeometryCache = { key: "", value: null };
+      const thetaSrRuntimeBounds = { min: defaults.SL0_theta, max: defaults.SL4_theta };
       const leafPinVisibility = {};
       let pinControlSignature = "";
       const controls = document.getElementById("controls");
@@ -2998,9 +2999,13 @@
       }
 
       function render() {
-        const model = buildPins();
+        let model = buildPins();
         updateLeafPinControls(model);
         const leaf = getLeafGeometry(model.reference);
+        if (syncThetaSrBounds(leaf)) {
+          model = buildPins();
+          updateLeafPinControls(model);
+        }
         drawVariableAperture(model, leaf);
         drawLeaf(model, leaf);
         updateText(model, leaf);
@@ -3018,7 +3023,10 @@
       }
 
       function geometryCacheKey(statorPin) {
-        const values = inputDefs.map((def) => `${def.key}:${state[def.key]}`).join("|");
+        const values = inputDefs
+          .filter((def) => def.key !== "theta_sr")
+          .map((def) => `${def.key}:${state[def.key]}`)
+          .join("|");
         const constraints = constraintDefs.map((def) => `${def.key}:${constraintEnabled(def.key) ? 1 : 0}`).join("|");
         return `${statorPin.index}|${values}|${constraints}`;
       }
@@ -3035,6 +3043,39 @@
       function invalidateLeafGeometryCache() {
         leafGeometryCache.key = "";
         leafGeometryCache.value = null;
+      }
+
+      function inputBounds(def) {
+        return def.key === "theta_sr" ? thetaSrRuntimeBounds : def;
+      }
+
+      function setInputControlValue(key) {
+        const range = document.getElementById(`${key}-range`);
+        const number = document.getElementById(`${key}-number`);
+        if (range) range.value = state[key];
+        if (number) number.value = state[key];
+      }
+
+      function syncThetaSrBounds(leaf) {
+        const rawMin = leaf?.slThetas?.sl0 ?? state.SL0_theta;
+        const rawMax = leaf?.slThetas?.sl4 ?? state.SL4_theta;
+        const min = Math.min(rawMin, rawMax);
+        const max = Math.max(rawMin, rawMax);
+        if (!Number.isFinite(min) || !Number.isFinite(max)) return false;
+        thetaSrRuntimeBounds.min = min;
+        thetaSrRuntimeBounds.max = max;
+        const range = document.getElementById("theta_sr-range");
+        const number = document.getElementById("theta_sr-number");
+        for (const input of [range, number]) {
+          if (!input) continue;
+          input.min = fmt(min, 6);
+          input.max = fmt(max, 6);
+        }
+        const nextTheta = clamp(state.theta_sr, min, max);
+        const changed = Math.abs(nextTheta - state.theta_sr) > 1e-9;
+        if (changed) state.theta_sr = Number(nextTheta.toFixed(6));
+        setInputControlValue("theta_sr");
+        return changed;
       }
 
       function canAcceptCurrentState() {
@@ -3062,7 +3103,7 @@
           range.id = `${def.key}-range`;
           range.min = def.min;
           range.max = def.max;
-          range.step = def.step;
+          range.step = def.key === "theta_sr" ? "any" : def.step;
           range.value = state[def.key];
           const number = document.createElement("input");
           number.type = "number";
@@ -3074,14 +3115,15 @@
           const sync = (rawValue) => {
             const previousValue = state[def.key];
             const value = def.step === 1 ? Math.round(Number(rawValue)) : Number(rawValue);
-            state[def.key] = Math.max(def.min, Math.min(def.max, value));
-            invalidateLeafGeometryCache();
-            if (!canAcceptCurrentState()) {
+            const bounds = inputBounds(def);
+            state[def.key] = clamp(value, bounds.min, bounds.max);
+            const affectsLeafGeometry = def.key !== "theta_sr";
+            if (affectsLeafGeometry) invalidateLeafGeometryCache();
+            if (affectsLeafGeometry && !canAcceptCurrentState()) {
               state[def.key] = previousValue;
               invalidateLeafGeometryCache();
             }
-            range.value = state[def.key];
-            number.value = state[def.key];
+            setInputControlValue(def.key);
             requestRender();
           };
           range.addEventListener("input", (event) => sync(event.target.value));

@@ -568,8 +568,8 @@
         { key: "theta_sr", label: "theta_sr", unit: "deg", min: -180, max: 180, step: 0.1, value: 14.7 },
         { key: "SL0_theta", label: "SL0 theta", unit: "deg", min: -180, max: 180, step: 0.1, value: 14 },
         { key: "SL4_theta", label: "SL4 theta", unit: "deg", min: -180, max: 180, step: 0.1, value: 28 },
-        { key: "D_F1_47", label: "D_F1.47", unit: "mm dia", min: 0.1, max: 20, step: 0.001, value: 7.83 },
-        { key: "D_F1_7", label: "D_F1.7", unit: "mm dia", min: 0.1, max: 20, step: 0.001, value: 6.52 },
+        { key: "D_F1_47", label: "D_F1.47", unit: "mm dia", min: 0.1, max: 20, step: 0.001, value: 8.086 },
+        { key: "D_F1_7", label: "D_F1.7", unit: "mm dia", min: 0.1, max: 20, step: 0.001, value: 6.878 },
         { key: "D_F4_0", label: "D_F4.0", unit: "mm dia", min: 0.1, max: 20, step: 0.001, value: 2.78 },
         { key: "D_F6_0", label: "D_F6.0", unit: "mm dia", min: 0.1, max: 20, step: 0.001, value: 2.2 },
         { key: "Leaf_max", label: "Leaf_max", unit: "mm dia", min: 0.1, max: 40, step: 0.01, value: 16.5 },
@@ -647,7 +647,7 @@
         {
           key: "pressureTarget",
           label: "Pressure angle target",
-          note: "SL0, SL2, and SL4 epsilon are solved toward Pressure angle before the SL4 theta seed.",
+          note: "SL1, SL2, and SL3 epsilon are solved toward Pressure angle before the SL4 theta seed.",
           enabled: true,
           blocking: false
         }
@@ -2004,7 +2004,7 @@
       }
 
       function pressureTargetStatus(slPoints) {
-        const targetLabels = new Set(["SL0", "SL2", "SL4"]);
+        const targetLabels = new Set(["SL1", "SL2", "SL3"]);
         const targets = slPoints
           .filter((item) => targetLabels.has(item.label) && Number.isFinite(item.epsilon))
           .map((item) => ({
@@ -2973,7 +2973,7 @@
         for (const item of leaf.slPoints) {
           const epsilonNote = Number.isFinite(item.epsilon) ? `, epsilon(+) = ${fmt(item.epsilon, 4)}deg` : "";
           const rangeNote = item.arcNormalVector ? `, range = ${item.pressureAngleValid ? "OK" : "NG"}` : "";
-          const targetNote = ["SL0", "SL2", "SL4"].includes(item.label) && Number.isFinite(item.epsilon)
+          const targetNote = ["SL1", "SL2", "SL3"].includes(item.label) && Number.isFinite(item.epsilon)
             ? `, target delta = ${fmt(item.epsilon - state.Pressure_angle, 4)}deg`
             : "";
           items.push({
